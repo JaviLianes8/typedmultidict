@@ -5,6 +5,6 @@ from __future__ import annotations
 from ._cimultidict import CIMultiDict
 from ._multidict import MultiDict
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = ["CIMultiDict", "MultiDict"]
