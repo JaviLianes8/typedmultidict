@@ -8,10 +8,10 @@ Progress:
 - [x] Equality, pickling and copying rules
 - [x] Case-insensitive variant: strict key type, lookups by any object
 - [x] Contracts: model-based property tests, oracle tests, typing proof, README examples, installed wheel e2e
-- [ ] Mutation run proves the tests bite
+- [x] Mutation run proves the tests bite
 - [x] Docs: README, CHANGELOG, docstrings, packaging metadata
 - [ ] Gates: ruff format, ruff check, mypy --strict, pytest
-- [ ] Independent review findings fixed with regression tests
+- [x] Independent review findings fixed with regression tests
 - [ ] Pull request opened, guard clean
 
 ## Starting point
@@ -116,6 +116,26 @@ running them; both are used in the tests as optional oracles only.
   string keys; `update` accepts them because `MutableMapping.update` does.
 - Read-only proxies and an `istr` type: a later round if there is demand.
 - Thread safety: like `dict` subclasses written in Python, concurrent writers need a lock.
+
+## Verification
+
+- Gates on CPython 3.13.2 in a fresh clone and venv: `ruff format --check .`,
+  `ruff check .`, `mypy --strict src` (and `src tests`) and `pytest` with
+  `TYPEDMULTIDICT_E2E=1`, so the built wheel is installed in a new venv and exercised.
+- Hypothesis drives both classes through random sequences of every mutating method and
+  compares them with a list-of-pairs model after each step; the same operations are
+  compared with `multidict` 7.1.0 and, for the mapping view, Werkzeug 3.1.9.
+- Mutation run: 56 single changes to the guarded logic (index upkeep, rollback, version
+  checks, update planning, key folding, pickling state, input validation, views), each
+  with bytecode writes off, `__pycache__` purged and a 300 s timeout, baseline green
+  before and after. The first run killed 48; tests added for six survivors kill them.
+  Two survivors cannot be told apart by any test: skipping the early return in `_drop`
+  for an empty list (it only bumps the version, which every caller bumps anyway), and
+  applying `update`'s removals before its additions (every key comparison already ran
+  while planning, so the additions cannot fail afterwards for keys with a deterministic
+  `__eq__`).
+- A pickle written by the 0.1.0 code (taken from `main`) loads under 0.2.0 at protocols
+  0, 2 and 5.
 
 ## Review fixes
 
