@@ -2,127 +2,169 @@
 
 from __future__ import annotations
 
-from collections.abc import Hashable, Iterable, Iterator, Mapping, MutableMapping
-from typing import TypeVar, Union
+import copy as _copy
+from collections.abc import Hashable
+from typing import TYPE_CHECKING, Any, TypeVar, overload
+
+from ._pairs import MultiDictInput, read_pairs
+from ._storage import _Entry, _Storage
+from ._views import AllItemsView, AllValuesView
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from _typeshed import SupportsKeysAndGetItem
 
 K = TypeVar("K", bound=Hashable)
 V = TypeVar("V")
+T = TypeVar("T")
+Self = TypeVar("Self", bound="MultiDict[Any, Any]")
 
-MultiDictInput = Union["MultiDict[K, V]", Mapping[K, V], Iterable[tuple[K, V]]]
-
-
-class _Missing:
-    pass
+_MISSING: Any = object()
 
 
-_MISSING = _Missing()
-
-
-class MultiDict(MutableMapping[K, V]):
+class MultiDict(_Storage[K, V]):
     """A typed, insertion-ordered multi-value mapping.
 
     Mapping operations act on the first value of each key, so the type behaves like a
-    normal mapping. The multi-value surface (``add``, ``getall``, ``allitems``) exposes
-    every stored pair in insertion order.
+    normal mapping (``len()`` counts keys). The multi-value surface (``add``, ``getall``,
+    ``allitems`` and friends) sees every stored pair in insertion order.
     """
 
     def __init__(self, initial: MultiDictInput[K, V] | None = None) -> None:
-        self._items: list[tuple[K, V]] = []
+        self._setup()
         if initial is not None:
             self.extend(initial)
 
-    def _norm(self, key: K) -> Hashable:
-        return key
+    def _collect(self, source: object, extra: dict[str, Any]) -> list[tuple[Hashable, K, V]]:
+        pairs = read_pairs(source, _Storage)
+        pairs.extend(extra.items())
+        return [(self._token(key), key, value) for key, value in pairs]
 
     def add(self, key: K, value: V) -> None:
         """Append another value for ``key`` without replacing existing ones."""
-        self._items.append((key, value))
+        self._append([(self._token(key), key, value)])
 
     def extend(self, other: MultiDictInput[K, V]) -> None:
-        """Add every pair from another mapping, multi-dict or iterable of pairs."""
-        for key, value in self._pairs(other):
-            self._items.append((key, value))
+        """Append every pair of a mapping, multi-dict or iterable of pairs."""
+        self._append(self._collect(other, {}))
 
-    def getone(self, key: K) -> V:
-        """Return the first value for ``key`` or raise ``KeyError``."""
-        return self[key]
+    def merge(self, other: MultiDictInput[K, V]) -> None:
+        """Append the pairs whose key is not present yet; keys already here are skipped."""
+        present = set(self._index)
+        self._append([item for item in self._collect(other, {}) if item[0] not in present])
+
+    @overload
+    def update(self, other: SupportsKeysAndGetItem[K, V], /) -> None: ...
+    @overload
+    def update(
+        self: MultiDict[str, V], other: SupportsKeysAndGetItem[str, V], /, **kwargs: V
+    ) -> None: ...
+    @overload
+    def update(self, other: Iterable[tuple[K, V]], /) -> None: ...
+    @overload
+    def update(self: MultiDict[str, V], other: Iterable[tuple[str, V]], /, **kwargs: V) -> None: ...
+    @overload
+    def update(self: MultiDict[str, V], /, **kwargs: V) -> None: ...
+
+    def update(self, other: Any = (), /, **kwargs: Any) -> None:
+        """Replace the values of every incoming key, reusing the old positions in order.
+
+        Extra new values go to the end, extra old values are removed, and keys that do
+        not appear in ``other`` are left alone.
+        """
+        # Plan first: every hash and key comparison happens before anything changes.
+        used: dict[Hashable, int] = {}
+        reused: list[tuple[_Entry, K, V]] = []
+        fresh: list[tuple[Hashable, K, V]] = []
+        for token, key, value in self._collect(other, kwargs):
+            slot = used.get(token, 0)
+            used[token] = slot + 1
+            entries = self._index.get(token, [])
+            if slot < len(entries):
+                reused.append((entries[slot], key, value))
+            else:
+                fresh.append((token, key, value))
+        stale = [entry for token, n in used.items() for entry in self._index.get(token, [])[n:]]
+        self._append(fresh)  # undoes itself if it fails; nothing after it can fail
+        for entry, key, value in reused:
+            entry.key = key
+            entry.value = value
+        self._drop(stale)
+
+    @overload
+    def getone(self, key: K) -> V: ...
+    @overload
+    def getone(self, key: K, default: T) -> V | T: ...
+
+    def getone(self, key: K, default: Any = _MISSING) -> Any:
+        """Return the first value for ``key``, else ``default`` or raise ``KeyError``."""
+        entries = self._index.get(self._probe(key))
+        if entries is not None:
+            return entries[0].value
+        if default is _MISSING:
+            raise KeyError(key)
+        return default
 
     def getall(self, key: K) -> list[V]:
-        """Return every value for ``key`` in insertion order, empty if absent."""
-        token = self._norm(key)
-        return [value for stored, value in self._items if self._norm(stored) == token]
+        """Return a new list of every value for ``key`` in order, empty if absent."""
+        return [entry.value for entry in self._index.get(self._probe(key), ())]
 
-    def popall(self, key: K, default: list[V] | _Missing = _MISSING) -> list[V]:
-        """Remove and return every value for ``key``; raise ``KeyError`` if absent."""
-        values = self.getall(key)
-        if not values:
-            if isinstance(default, _Missing):
+    @overload
+    def popone(self, key: K) -> V: ...
+    @overload
+    def popone(self, key: K, default: T) -> V | T: ...
+
+    def popone(self, key: K, default: Any = _MISSING) -> Any:
+        """Remove and return the first value for ``key``; later values stay."""
+        entries = self._index.get(self._probe(key))
+        if entries is None:
+            if default is _MISSING:
                 raise KeyError(key)
             return default
-        token = self._norm(key)
-        self._items = [pair for pair in self._items if self._norm(pair[0]) != token]
-        return values
+        first = entries[0]
+        self._drop([first])
+        return first.value
 
-    def allitems(self) -> Iterator[tuple[K, V]]:
-        """Iterate over every ``(key, value)`` pair in insertion order."""
-        yield from self._items
+    @overload
+    def popall(self, key: K) -> list[V]: ...
+    @overload
+    def popall(self, key: K, default: T) -> list[V] | T: ...
 
-    def __getitem__(self, key: K) -> V:
-        token = self._norm(key)
-        for stored, value in self._items:
-            if self._norm(stored) == token:
-                return value
-        raise KeyError(key)
+    def popall(self, key: K, default: Any = _MISSING) -> Any:
+        """Remove and return every value for ``key``; raise ``KeyError`` if absent."""
+        entries = self._index.get(self._probe(key))
+        if entries is None:
+            if default is _MISSING:
+                raise KeyError(key)
+            return default
+        self._drop(list(entries))
+        return [entry.value for entry in entries]
 
-    def __setitem__(self, key: K, value: V) -> None:
-        token = self._norm(key)
-        kept: list[tuple[K, V]] = []
-        replaced = False
-        for stored, current in self._items:
-            if self._norm(stored) != token:
-                kept.append((stored, current))
-            elif not replaced:
-                kept.append((key, value))
-                replaced = True
-        if not replaced:
-            kept.append((key, value))
-        self._items = kept
+    def popitem(self) -> tuple[K, V]:
+        """Remove and return the last pair added; other values of its key stay."""
+        if not self._entries:
+            raise KeyError("popitem(): multi-dict is empty")
+        last = self._entries.pop()
+        entries = self._index[last.token]
+        entries.pop()
+        if not entries:
+            del self._index[last.token]
+        self._version += 1
+        return last.key, last.value
 
-    def __delitem__(self, key: K) -> None:
-        token = self._norm(key)
-        kept = [pair for pair in self._items if self._norm(pair[0]) != token]
-        if len(kept) == len(self._items):
-            raise KeyError(key)
-        self._items = kept
+    def allitems(self) -> AllItemsView[K, V]:
+        """A live view of every ``(key, value)`` pair in insertion order."""
+        return AllItemsView(self)
 
-    def __iter__(self) -> Iterator[K]:
-        seen: set[Hashable] = set()
-        for key, _ in self._items:
-            token = self._norm(key)
-            if token not in seen:
-                seen.add(token)
-                yield key
+    def allvalues(self) -> AllValuesView[V]:
+        """A live view of every value in insertion order."""
+        return AllValuesView(self)
 
-    def __len__(self) -> int:
-        return len({self._norm(key) for key, _ in self._items})
+    def to_dict(self) -> dict[K, list[V]]:
+        """A new ``dict`` from each key (first spelling) to a new list of its values."""
+        return {key: self.getall(key) for key in self}
 
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, MultiDict):
-            return NotImplemented
-        left = [(self._norm(k), v) for k, v in self._items]
-        right = [(other._norm(k), v) for k, v in other._items]
-        return left == right
-
-    __hash__ = None  # type: ignore[assignment]
-
-    def __repr__(self) -> str:
-        return f"{type(self).__name__}({self._items!r})"
-
-    def _pairs(self, other: MultiDictInput[K, V]) -> Iterator[tuple[K, V]]:
-        if isinstance(other, MultiDict):
-            yield from other._items
-        elif isinstance(other, Mapping):
-            for key in other:
-                yield key, other[key]
-        else:
-            yield from other
+    def copy(self: Self) -> Self:
+        """A shallow copy of the same type; values are shared, not copied."""
+        return _copy.copy(self)

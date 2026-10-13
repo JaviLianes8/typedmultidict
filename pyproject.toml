@@ -1,27 +1,44 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
 name = "typedmultidict"
-version = "0.1.0"
+version = "0.2.0"
 description = "Pure-Python typed ordered multi-value dictionary with a case-insensitive variant"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Javier Lianes", email = "javier@lianes8studio.com" }]
-keywords = []
+keywords = ["multidict", "multi-value", "dictionary", "mapping", "headers", "typed"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Typing :: Typed",
 ]
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["ruff", "mypy", "pytest", "build", "twine"]
+dev = [
+    "ruff",
+    "mypy",
+    "pytest",
+    "hypothesis",
+    "build",
+    "twine",
+    # Test-only reference implementations; the library never imports them.
+    "multidict",
+    "werkzeug",
+]
 
 [project.urls]
 Homepage = "https://lianes8studio.com"
@@ -30,6 +47,9 @@ Issues = "https://github.com/JaviLianes8/typedmultidict/issues"
 Changelog = "https://github.com/JaviLianes8/typedmultidict/blob/main/CHANGELOG.md"
 LinkedIn = "https://www.linkedin.com/in/jlianes/"
 Funding = "https://buymeacoffee.com/jlianesglrs"
+
+[tool.hatch.build.targets.sdist]
+exclude = [".github", "IMPROVEMENTS-round*.md"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/typedmultidict"]
