@@ -7,7 +7,7 @@ from collections.abc import Hashable
 from typing import TYPE_CHECKING, Any, TypeVar, overload
 
 from ._pairs import MultiDictInput, read_pairs
-from ._storage import _Storage
+from ._storage import _Entry, _Storage
 from ._views import AllItemsView, AllValuesView
 
 if TYPE_CHECKING:
@@ -30,8 +30,6 @@ class MultiDict(_Storage[K, V]):
     normal mapping (``len()`` counts keys). The multi-value surface (``add``, ``getall``,
     ``allitems`` and friends) sees every stored pair in insertion order.
     """
-
-    __slots__ = ()
 
     def __init__(self, initial: MultiDictInput[K, V] | None = None) -> None:
         self._setup()
@@ -75,20 +73,24 @@ class MultiDict(_Storage[K, V]):
         Extra new values go to the end, extra old values are removed, and keys that do
         not appear in ``other`` are left alone.
         """
-        incoming = self._collect(other, kwargs)
+        # Plan first: every hash and key comparison happens before anything changes.
         used: dict[Hashable, int] = {}
+        reused: list[tuple[_Entry, K, V]] = []
         fresh: list[tuple[Hashable, K, V]] = []
-        for token, key, value in incoming:
+        for token, key, value in self._collect(other, kwargs):
             slot = used.get(token, 0)
             used[token] = slot + 1
             entries = self._index.get(token, [])
             if slot < len(entries):
-                entries[slot].key = key
-                entries[slot].value = value
+                reused.append((entries[slot], key, value))
             else:
                 fresh.append((token, key, value))
-        self._drop([entry for token, n in used.items() for entry in self._index.get(token, [])[n:]])
-        self._append(fresh)
+        stale = [entry for token, n in used.items() for entry in self._index.get(token, [])[n:]]
+        self._append(fresh)  # undoes itself if it fails; nothing after it can fail
+        for entry, key, value in reused:
+            entry.key = key
+            entry.value = value
+        self._drop(stale)
 
     @overload
     def getone(self, key: K) -> V: ...

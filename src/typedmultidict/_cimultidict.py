@@ -20,8 +20,6 @@ class CIMultiDict(MultiDict[str, V]):
     looking one up simply finds nothing.
     """
 
-    __slots__ = ()
-
     _folds_case: ClassVar[bool] = True
 
     def _token(self, key: str) -> Hashable:

@@ -72,9 +72,11 @@ def test_pickle_round_trips_at_every_protocol(protocol: int) -> None:
 def test_pickles_store_plain_pairs() -> None:
     md: MultiDict[str, int] = MultiDict([("a", 1), ("a", 2)])
     rebuild, args, state = md.__reduce__()
-    assert args == (MultiDict, [("a", 1), ("a", 2)])
-    assert state is None
-    assert rebuild(*args) == md
+    assert args == (MultiDict,)
+    assert state == ([("a", 1), ("a", 2)], None, None)
+    twin = rebuild(*args)
+    twin.__setstate__(state)
+    assert twin == md
 
 
 def test_subclass_state_survives_copy_and_pickle() -> None:

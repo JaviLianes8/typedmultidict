@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+import copyreg
+import reprlib
 from collections.abc import Hashable, Iterator, Mapping, MutableMapping
 from typing import Any, ClassVar, TypeVar
+
+from ._state import restore, state_of
 
 K = TypeVar("K", bound=Hashable)
 V = TypeVar("V")
 
 _CHANGED = "multi-dict changed during iteration"
+# Rebuilds with cls.__new__(cls); pickle encodes it as the compact NEWOBJ opcode.
+_NEWOBJ: Any = getattr(copyreg, "__newobj__")  # noqa: B009
 
 
 class _Entry:
@@ -22,8 +28,8 @@ class _Entry:
 
 class _Storage(MutableMapping[K, V]):
     # Pairs live in one ordered list; the index maps each key token to its entries in order,
-    # so lookups never scan the list. Only removals pay a linear pass.
-    __slots__ = ("_entries", "_index", "_version")
+    # so lookups never scan the list. Only removals pay a linear pass. No __slots__: 0.1.0
+    # instances took extra attributes and weak references, and still do.
 
     _folds_case: ClassVar[bool] = False
 
@@ -41,12 +47,20 @@ class _Storage(MutableMapping[K, V]):
         return key
 
     def _append(self, pairs: list[tuple[Hashable, K, V]]) -> None:
-        for token, _, _ in pairs:
-            hash(token)  # an unhashable key must fail before anything is stored
-        for token, key, value in pairs:
-            entry = _Entry(token, key, value)
-            self._entries.append(entry)
-            self._index.setdefault(token, []).append(entry)
+        added: list[_Entry] = []
+        try:
+            for token, key, value in pairs:
+                entry = _Entry(token, key, value)
+                # A key whose __hash__ or __eq__ raises fails here; undo what came before.
+                self._index.setdefault(token, []).append(entry)
+                added.append(entry)
+        except BaseException:
+            for entry in reversed(added):
+                self._index[entry.token].pop()
+                if not self._index[entry.token]:
+                    del self._index[entry.token]
+            raise
+        self._entries.extend(added)
         self._version += 1
 
     def _drop(self, doomed: list[_Entry]) -> None:
@@ -63,10 +77,13 @@ class _Storage(MutableMapping[K, V]):
         self._version += 1
 
     def _iterate(self, version: int) -> Iterator[_Entry]:
+        # Checked before each step, so a change made between iter() and next() is caught.
         for entry in self._entries:
-            yield entry
             if self._version != version:
                 raise RuntimeError(_CHANGED)
+            yield entry
+        if self._version != version:
+            raise RuntimeError(_CHANGED)
 
     def __getitem__(self, key: K) -> V:
         entries = self._index.get(self._probe(key))
@@ -97,8 +114,12 @@ class _Storage(MutableMapping[K, V]):
         return self._probe(key) in self._index
 
     def __iter__(self) -> Iterator[K]:
+        # Not a generator itself, so the version is taken when iter() is called.
+        return self._first_keys(self._iterate(self._version))
+
+    def _first_keys(self, entries: Iterator[_Entry]) -> Iterator[K]:
         seen: set[Hashable] = set()
-        for entry in self._iterate(self._version):
+        for entry in entries:
             if entry.token not in seen:
                 seen.add(entry.token)
                 yield entry.key
@@ -123,16 +144,18 @@ class _Storage(MutableMapping[K, V]):
 
     __hash__ = None  # type: ignore[assignment]
 
+    @reprlib.recursive_repr()
     def __repr__(self) -> str:
         pairs = [(entry.key, entry.value) for entry in self._entries]
         return f"{type(self).__name__}({pairs!r})"
 
     def __reduce__(self) -> tuple[Any, ...]:
-        pairs = [(entry.key, entry.value) for entry in self._entries]
-        attrs = getattr(self, "__dict__", None) or None
-        slots = {name: getattr(self, name) for name in _extra_slots(self) if hasattr(self, name)}
-        state = (attrs, slots) if slots else attrs
-        return (_rebuild, (type(self), pairs), state)
+        # The pairs travel as state, not as arguments, so an object that contains itself is
+        # memoised before its pairs are copied. Built with __new__: no __init__ is called.
+        return (_NEWOBJ, (type(self),), state_of(self))
+
+    def __setstate__(self, state: Any) -> None:
+        restore(self, state)
 
 
 def _compared(entries: list[_Entry], fold: bool) -> list[tuple[Any, Any]]:
@@ -142,22 +165,3 @@ def _compared(entries: list[_Entry], fold: bool) -> list[tuple[Any, Any]]:
         (str.lower(entry.key) if isinstance(entry.key, str) else entry.key, entry.value)
         for entry in entries
     ]
-
-
-def _extra_slots(obj: object) -> list[str]:
-    # Slots a subclass adds on top of the storage; ours are rebuilt from the pairs.
-    names: list[str] = []
-    for klass in type(obj).__mro__:
-        if klass is _Storage:
-            break
-        declared = klass.__dict__.get("__slots__", ())
-        names.extend([declared] if isinstance(declared, str) else declared)
-    return [name for name in names if name not in ("__dict__", "__weakref__")]
-
-
-def _rebuild(cls: type[_Storage[Any, Any]], pairs: list[tuple[Any, Any]]) -> _Storage[Any, Any]:
-    # Restores without calling a subclass __init__, whose signature may differ.
-    obj = cls.__new__(cls)
-    obj._setup()
-    obj._append([(obj._token(key), key, value) for key, value in pairs])
-    return obj

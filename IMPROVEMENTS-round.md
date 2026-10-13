@@ -116,3 +116,21 @@ running them; both are used in the tests as optional oracles only.
   string keys; `update` accepts them because `MutableMapping.update` does.
 - Read-only proxies and an `istr` type: a later round if there is demand.
 - Thread safety: like `dict` subclasses written in Python, concurrent writers need a lock.
+
+## Review fixes
+
+- `update` plans every key lookup before changing anything, so an unhashable key late in
+  the input no longer leaves earlier keys replaced.
+- Adding pairs rolls itself back when a key's `__hash__` or `__eq__` raises halfway; the
+  pair list and the index could drift apart before.
+- An iterator taken with `iter()` before a change now raises on its first step, as `dict`
+  does; the version is read when `iter()` is called, not on the first `next()`.
+- The classes have no `__slots__` again, so instances take attributes and weak references
+  as in 0.1.0, and pickles written by 0.1.0 load.
+- Subclass slots with private (`__name`) names survive copies and pickles.
+- A multi-dict that contains itself has a finite `repr`, and copies and pickles of it work:
+  the pairs travel as state, after the object is memoised.
+- Pickles reference `typedmultidict.MultiDict` and `typedmultidict.CIMultiDict` only, so
+  moving the private modules cannot break stored pickles.
+- The README says iteration checks follow `multidict` (every write counts) and how other
+  mapping types compare.

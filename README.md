@@ -76,7 +76,8 @@ print(5 in headers)  # False
 ```
 
 Views from `allitems()` and `allvalues()` follow the mapping. Changing the mapping while
-iterating over it, or over any of its views, raises `RuntimeError`, as `dict` does:
+iterating over it, or over any of its views, raises `RuntimeError`. As in `multidict`,
+every write counts, even replacing a value in place (which `dict` allows):
 
 ```python
 from typedmultidict import MultiDict
@@ -147,7 +148,8 @@ key instead of raising, and `pop` removes every value of the key.
 
 Like `dict`, a multi-dict is not safe to change from several threads at once without a
 lock. Equality between a plain and a case-insensitive multi-dict folds case, so it is not
-transitive across the two kinds.
+transitive across the two kinds. Any other mapping, a `multidict.MultiDict` included, is
+compared as a plain mapping.
 
 ## Why
 

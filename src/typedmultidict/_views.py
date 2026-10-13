@@ -25,8 +25,7 @@ class AllItemsView(Collection[tuple[K, V]], Generic[K, V]):
 
     def __iter__(self) -> Iterator[tuple[K, V]]:
         mapping = self._mapping
-        for entry in mapping._iterate(mapping._version):
-            yield entry.key, entry.value
+        return ((entry.key, entry.value) for entry in mapping._iterate(mapping._version))
 
     def __contains__(self, item: object) -> bool:
         if not isinstance(item, tuple) or len(item) != 2:
@@ -52,8 +51,7 @@ class AllValuesView(Collection[V], Generic[V]):
 
     def __iter__(self) -> Iterator[V]:
         mapping = self._mapping
-        for entry in mapping._iterate(mapping._version):
-            yield entry.value
+        return (entry.value for entry in mapping._iterate(mapping._version))
 
     def __contains__(self, value: object) -> bool:
         return any(entry.value is value or entry.value == value for entry in self._mapping._entries)
