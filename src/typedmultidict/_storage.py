@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Hashable, Iterable, Iterator, Mapping, MutableMapping
+from collections.abc import Hashable, Iterator, Mapping, MutableMapping
 from typing import Any, ClassVar, TypeVar
 
 K = TypeVar("K", bound=Hashable)
@@ -40,7 +40,9 @@ class _Storage(MutableMapping[K, V]):
         """The identity to look a key up by; a refused key matches nothing."""
         return key
 
-    def _append(self, pairs: Iterable[tuple[Hashable, K, V]]) -> None:
+    def _append(self, pairs: list[tuple[Hashable, K, V]]) -> None:
+        for token, _, _ in pairs:
+            hash(token)  # an unhashable key must fail before anything is stored
         for token, key, value in pairs:
             entry = _Entry(token, key, value)
             self._entries.append(entry)
@@ -129,7 +131,7 @@ class _Storage(MutableMapping[K, V]):
         pairs = [(entry.key, entry.value) for entry in self._entries]
         attrs = getattr(self, "__dict__", None) or None
         slots = {name: getattr(self, name) for name in _extra_slots(self) if hasattr(self, name)}
-        state = (attrs, slots or None) if attrs or slots else None
+        state = (attrs, slots) if slots else attrs
         return (_rebuild, (type(self), pairs), state)
 
 
