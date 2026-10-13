@@ -2,14 +2,14 @@
 
 Progress:
 - [x] Brainstorm ranked improvements (this file)
-- [ ] Indexed storage: constant-time lookups, safe self-extend, atomic bulk input
-- [ ] Full multi-value API: defaults, `popone`, `merge`, multi-aware `update` and `popitem`, `to_dict`, `copy`
-- [ ] Live views over every pair, change detection during iteration
-- [ ] Equality, pickling and copying rules
-- [ ] Case-insensitive variant: strict key type, lookups by any object
-- [ ] Contracts: model-based property tests, oracle tests, typing proof, README examples, installed wheel e2e
+- [x] Indexed storage: constant-time lookups, safe self-extend, atomic bulk input
+- [x] Full multi-value API: defaults, `popone`, `merge`, multi-aware `update` and `popitem`, `to_dict`, `copy`
+- [x] Live views over every pair, change detection during iteration
+- [x] Equality, pickling and copying rules
+- [x] Case-insensitive variant: strict key type, lookups by any object
+- [x] Contracts: model-based property tests, oracle tests, typing proof, README examples, installed wheel e2e
 - [ ] Mutation run proves the tests bite
-- [ ] Docs: README, CHANGELOG, docstrings, packaging metadata
+- [x] Docs: README, CHANGELOG, docstrings, packaging metadata
 - [ ] Gates: ruff format, ruff check, mypy --strict, pytest
 - [ ] Independent review findings fixed with regression tests
 - [ ] Pull request opened, guard clean
