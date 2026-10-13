@@ -10,7 +10,7 @@ Progress:
 - [x] Contracts: model-based property tests, oracle tests, typing proof, README examples, installed wheel e2e
 - [x] Mutation run proves the tests bite
 - [x] Docs: README, CHANGELOG, docstrings, packaging metadata
-- [ ] Gates: ruff format, ruff check, mypy --strict, pytest
+- [x] Gates: ruff format, ruff check, mypy --strict, pytest
 - [x] Independent review findings fixed with regression tests
 - [ ] Pull request opened, guard clean
 
