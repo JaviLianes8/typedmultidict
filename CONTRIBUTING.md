@@ -14,6 +14,9 @@ pip install -r requirements-dev.txt
 - Add a test for the behaviour you change. Tests inject time, disk and network; they
   never touch the real thing.
 - Run `scripts/check.ps1` (format, lint, types, tests) and make sure it passes.
+- Set `TYPEDMULTIDICT_E2E=1` to also build the wheel, install it in a fresh venv and
+  exercise it. `multidict` and `werkzeug` are dev dependencies used only as reference
+  implementations in the tests; the library never imports them.
 - One logical change per commit, imperative subject line.
 
 Open an issue first if the change is large or shifts the public API.
