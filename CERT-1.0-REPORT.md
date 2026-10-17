@@ -168,3 +168,15 @@ three batches. 36 mutants: 32 killed at once, 3 survivors closed by contracts ad
 | A34 | `_mapping.py` | clear leaves the index | `tests/test_abc_mixins.py::test_overrides_match_the_mixins` |
 | A35 | `__init__.py` | private module names | `tests/test_contract.py::test_every_exported_name_resolves_and_names_its_public_module` |
 | A36 | `_storage.py` | sweep floor 0 | equivalent control: sweeping earlier changes memory use, never results |
+
+## QA lenses (item 19)
+
+Five independent reviews, one at a time, each reading the certification rules, running
+the code and reporting only to the maintainer. Later rounds confirm the earlier findings
+and sweep at most 40 new mutations on the code changed since.
+
+| Lens | Round | Head | Verdict | Findings and outcome |
+| --- | --- | --- | --- | --- |
+| a. API and docs | 1 | a7001f1 | FAIL | signatures against the real 0.2.0 only add, every example and reference fact checked live, 20 000 random sequences against 0.2.0 differ only where the CHANGELOG says; `get`, `pop` and `setdefault` no longer went through the item hooks (a subclass saw different calls); README wheel count off by one; three survivors of 40 mutants (casefold in mixed equality, `allvalues` membership, `KeyError` arguments); source copies failed after a refetch because the byte hash was pinned; four wording details. Fixed in 2b3008e |
+| a | 2 | 2b3008e | FAIL | all round 1 findings confirmed fixed; 16 mutants on the changed code, two survivors (`get` and `pop` swallowing `TypeError`). Contracts added in fc26142 |
+| a | 3 | fc26142 | PASS | both survivors and a third (`setdefault` catching any exception) killed |
