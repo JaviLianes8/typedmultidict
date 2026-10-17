@@ -18,6 +18,12 @@ assert importlib.resources.files("typedmultidict").joinpath("py.typed").is_file(
 # No runtime dependency: every requirement belongs to the optional dev extra.
 assert all("extra ==" in r for r in importlib.metadata.requires("typedmultidict") or [])
 assert typedmultidict.__all__ == ["AllItemsView", "AllValuesView", "CIMultiDict", "MultiDict"]
+meta = importlib.metadata.metadata("typedmultidict")
+assert meta["Requires-Python"] == ">=3.10" and meta["License-Expression"] == "MIT"
+assert "Development Status :: 5 - Production/Stable" in meta.get_all("Classifier")
+assert meta["Description-Content-Type"] == "text/markdown"
+urls = {u.split(", ", 1)[0]: u.split(", ", 1)[1] for u in meta.get_all("Project-URL")}
+assert {"Homepage", "Source", "Issues", "Changelog"} <= set(urls)
 
 md = MultiDict([("a", 1), ("b", 2), ("a", 3)])
 md.update([("a", 7), ("c", 5), ("a", 8)])

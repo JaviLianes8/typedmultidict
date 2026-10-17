@@ -4,6 +4,11 @@
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path -Parent $PSScriptRoot)
 
+# The sdist takes every file git does not ignore: release only from a clean checkout.
+$dirty = git status --porcelain --untracked-files=all
+if ($LASTEXITCODE -ne 0) { throw "git status failed (exit $LASTEXITCODE)." }
+if ($dirty) { throw "The working tree is not clean; commit or remove these first:`n$dirty" }
+
 & powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check.ps1
 if ($LASTEXITCODE -ne 0) { throw "The gate failed (exit $LASTEXITCODE): nothing was built or uploaded." }
 

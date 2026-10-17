@@ -24,8 +24,7 @@ behaviour described in the README and the guide. Later 1.x releases only add.
 ### Changed (upgrading from 0.2.0)
 
 - Removing pairs no longer scans the whole multi-dict: `del md[key]`, `pop`, `popone`,
-  `popall`, `popitem`, assignment and `update` cost time in proportion to the pairs they
-  remove. Deleting every key one by one is linear overall instead of quadratic.
+  `popall`, assignment and `update` cost time in proportion to the pairs they remove. Deleting every key one by one is linear overall instead of quadratic.
 - Bulk input reads at most three items of each element, so an endless or huge element
   fails at once with `ValueError` instead of hanging. The message gives the exact length
   of a tuple or list and says "3 or more" for other iterables.
@@ -37,7 +36,8 @@ behaviour described in the README and the guide. Later 1.x releases only add.
 - `keys()`, `items()` and `values()` iterators raise `RuntimeError` for a change made
   between `iter()` and the first item, as `iter(md)` and `dict` views do.
 - `repr` of a view held inside its own multi-dict prints `...` instead of recursing.
-- Views from `keys()`, `items()` and `values()` still pickle.
+- Every view pickles at every protocol (`allitems()` and `allvalues()` failed at protocols
+  0 and 1, and on Python 3.10 `keys()`, `items()` and `values()` came back broken).
 - `get`, `pop`, `setdefault`, `keys`, `items`, `values` and `clear` are now written out on
   the class with their own docstrings. They behave as the `collections.abc` mixins did,
   and `get`, `pop` and `setdefault` still go through `__getitem__`, `__setitem__` and

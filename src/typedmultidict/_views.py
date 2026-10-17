@@ -45,6 +45,9 @@ class AllItemsView(Collection[tuple[K, V]], Generic[K, V]):
         entries = self._mapping._index.get(self._mapping._probe(key), ())
         return any(entry.value is value or entry.value == value for entry in entries)
 
+    def __reduce__(self) -> tuple[Any, ...]:
+        return (type(self), (self._mapping,))
+
     @reprlib.recursive_repr()
     def __repr__(self) -> str:
         return f"{type(self).__name__}({list(self)!r})"
@@ -77,6 +80,9 @@ class AllValuesView(Collection[V], Generic[V]):
 
     def __contains__(self, value: object) -> bool:
         return any(entry.value is value or entry.value == value for entry in self._mapping._live())
+
+    def __reduce__(self) -> tuple[Any, ...]:
+        return (type(self), (self._mapping,))
 
     @reprlib.recursive_repr()
     def __repr__(self) -> str:
