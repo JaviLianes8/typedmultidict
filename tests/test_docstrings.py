@@ -35,7 +35,9 @@ def test_every_public_class_has_a_passing_example(cls: type) -> None:
     assert _run(cls.__name__, cls.__doc__) >= 2
 
 
-@pytest.mark.parametrize(("owner", "name", "member"), MEMBERS, ids=lambda x: str(x))
+@pytest.mark.parametrize(
+    ("owner", "name", "member"), MEMBERS, ids=[f"{owner}.{name}" for owner, name, _ in MEMBERS]
+)
 def test_every_public_method_has_a_passing_example(owner: str, name: str, member: object) -> None:
     assert _run(f"{owner}.{name}", inspect.getdoc(member)) >= 2
 
