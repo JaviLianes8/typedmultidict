@@ -142,7 +142,8 @@ scenarios. Each reference is driven only through the calls whose meaning it shar
 | `wsgiref.headers.Headers` | `add_header`, `get`, `get_all`, deleting a name, `setdefault`, `in`, pair order |
 | `http.client.parse_headers` | parsed field lines read through `CIMultiDict` exactly as through its message |
 
-The deliberate differences, each shown live by `tests/test_reference_differences.py`:
+The deliberate differences, each shown live by `tests/test_reference_differences.py` and
+`tests/test_reference_differences_more.py`:
 
 | Reference | Theirs | Ours |
 | --- | --- | --- |
@@ -155,11 +156,13 @@ The deliberate differences, each shown live by `tests/test_reference_differences
 | `wsgiref.headers` | assignment moves the name to the end; deleting a missing name is silent | assignment keeps the place of the first pair; `del` raises `KeyError` |
 | requests | one value per name | every value is kept |
 | multidict | `MultiDict` refuses non-`str` keys | any hashable key; only `CIMultiDict` needs `str` |
-| multidict, Werkzeug `Headers`, requests, `email`, `wsgiref` | looking up a non-`str` name in a case-insensitive mapping raises | it is simply absent |
+| multidict `CIMultiDict` | `get`, `getall` and `[]` with a non-`str` name raise `TypeError` (`in` says `False`) | the name is simply absent |
+| Werkzeug `Headers`, requests, `email`, `wsgiref` | even `in` with a non-`str` name raises | `in` says `False` |
 | Werkzeug `Headers`, `email`, `wsgiref` | `len()` counts field lines | `len()` counts names |
 | Werkzeug `Headers` | `popitem()` when empty raises `IndexError`; values become `str` | `KeyError`; values are stored as given |
 | `email.message` | `get_all(missing)` is `None` | `getall(missing)` is `[]` |
-| multidict | a plain and a case-insensitive multi-dict are never equal | equal after folding string keys |
+| multidict | a plain and a case-insensitive multi-dict differing only in key case are unequal | equal after folding string keys |
+| Werkzeug `Headers` | deleting a missing name is silent | `del` raises `KeyError` |
 
 The cited documentation (RFC 9110, the `collections.abc`, `email` and `wsgiref` pages,
 the multidict and Werkzeug docs, requests' `structures.py` at 2.34.2) is fetched by
