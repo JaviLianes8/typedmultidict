@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 from test_hostile import TARGET, _consistent, _Meddler
 
-from typedmultidict import MultiDict
+from typedmultidict import CIMultiDict, MultiDict
 
 
 @pytest.mark.parametrize("nth", [1, 2])
@@ -66,3 +66,19 @@ def test_the_constructor_goes_through_extend_so_subclass_hooks_see_its_input() -
     with pytest.raises(ValueError, match="negative"):
         Checked([("a", -1)])
     assert list(Checked([("a", 1)]).allitems()) == [("a", 1)]
+
+
+def test_a_falsy_non_none_initial_is_still_read() -> None:
+    for cls in (MultiDict, CIMultiDict):
+        with pytest.raises(TypeError):
+            cls(_loose(0))
+
+    class Falsy(list[tuple[str, int]]):
+        def __bool__(self) -> bool:
+            raise RuntimeError("never asked")
+
+    assert list(MultiDict(Falsy([("a", 1)])).allitems()) == [("a", 1)]
+
+
+def _loose(value: object) -> Any:
+    return value
