@@ -49,7 +49,8 @@ def main() -> int:
     data = capture(count, seed)
     out = ROOT / "tests" / "fixtures" / "oracle_runs.json"
     out.parent.mkdir(exist_ok=True)
-    out.write_text(json.dumps(data, separators=(",", ":"), sort_keys=True) + "\n", "utf-8")
+    text = json.dumps(data, separators=(",", ":"), sort_keys=True) + chr(10)
+    out.write_text(text, "utf-8", newline=chr(10))
     runs: dict[str, list[object]] = data["runs"]  # type: ignore[assignment]
     print(f"{sum(len(cases) for cases in runs.values())} scenarios, {data['versions']}")
     return 0

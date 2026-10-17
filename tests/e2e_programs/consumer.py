@@ -15,7 +15,8 @@ from typedmultidict import AllItemsView, AllValuesView, CIMultiDict, MultiDict
 assert "site-packages" in (typedmultidict.__file__ or ""), typedmultidict.__file__
 assert importlib.metadata.version("typedmultidict") == typedmultidict.__version__
 assert importlib.resources.files("typedmultidict").joinpath("py.typed").is_file()
-assert not importlib.metadata.requires("typedmultidict")
+# No runtime dependency: every requirement belongs to the optional dev extra.
+assert all("extra ==" in r for r in importlib.metadata.requires("typedmultidict") or [])
 assert typedmultidict.__all__ == ["AllItemsView", "AllValuesView", "CIMultiDict", "MultiDict"]
 
 md = MultiDict([("a", 1), ("b", 2), ("a", 3)])
