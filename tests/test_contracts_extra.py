@@ -136,3 +136,40 @@ def test_only_key_error_from_the_item_hook_means_absent() -> None:
         with pytest.raises(ValueError, match="refused"):
             call()
     assert not md
+
+
+def test_a_failed_extend_keeps_the_values_of_keys_already_present() -> None:
+    class Bad:
+        def __hash__(self) -> int:
+            raise RuntimeError("no hash")
+
+    md: MultiDict[Any, int] = MultiDict([("a", 1), ("b", 2)])
+    with pytest.raises(RuntimeError):
+        md.extend([("a", 9), ("b", 8), (Bad(), 3)])
+    assert md.getall("a") == [1] and md.getall("b") == [2] and md["a"] == 1
+
+
+def test_update_sweeps_the_holes_it_leaves() -> None:
+    md: MultiDict[str, int] = MultiDict()
+    tracemalloc.start()
+    try:
+        before = 0
+        for cycle in range(1000):
+            if cycle == 200:
+                before = tracemalloc.get_traced_memory()[0]
+            md.extend([("a", 1)] * 50)
+            md.update([("a", 0)])
+        # Without sweeps 800 cycles would keep 40 000 holes (over 300 kB of list slots).
+        grown = tracemalloc.get_traced_memory()[0] - before
+    finally:
+        tracemalloc.stop()
+    assert list(md.allitems()) == [("a", 0)]
+    assert grown < 60_000, grown
+
+
+def test_update_takes_positional_pairs_before_keyword_ones() -> None:
+    md: MultiDict[str, int] = MultiDict()
+    md.update([("b", 1)], c=2)
+    assert list(md.allitems()) == [("b", 1), ("c", 2)]
+    md.update([("a", 1)], a=2)
+    assert md.getall("a") == [1, 2]

@@ -154,9 +154,9 @@ removals cost time in proportion to the pairs they remove.
 
 The method names and their behaviour follow the `multidict` package, except where
 that would break the `Mapping` contract: `len()` counts keys (use
-`len(md.allitems())` for pairs), `keys` lists each key once, and `items` and `values`
-show the first value of each key, as Werkzeug's `MultiDict` does. `getall` returns an empty list for a missing
-key instead of raising, and `pop` removes every value of the key.
+`len(md.allitems())` for pairs), and `items` and `values` show the first value of each
+key, as Werkzeug's `MultiDict` does. `getall` returns an empty list for a missing key
+instead of raising, and `pop` removes every value of the key.
 
 Like `dict`, a multi-dict is not safe to change from several threads at once without a
 lock. Equality between a plain and a case-insensitive multi-dict folds case, so it is not

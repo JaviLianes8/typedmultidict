@@ -15,7 +15,10 @@ views of that list exist side by side:
 | Multi-value | every pair, in insertion order | `add`, `extend`, `getall`, `popone`, `popall`, `popitem`, `allitems`, `allvalues`, `to_dict` |
 
 So a `MultiDict` is a real `collections.abc.MutableMapping`: code written for a `dict`
-reads it correctly, and `len()` counts keys. `len(md.allitems())` counts pairs.
+reads it correctly, and `len()` counts keys. `len(md.allitems())` counts pairs. One
+caveat: `update` keeps every incoming value (see below), so `md.update([("a", 1)], a=2)`
+leaves `md["a"] == 1` where a `dict` would hold 2, and a case-insensitive multi-dict
+keeps both `A` and `a` from `update({"A": 0, "a": 1})`.
 
 ```python
 from typedmultidict import MultiDict
@@ -86,8 +89,10 @@ counts, even replacing a value in place, which `dict` allows.
 - Two multi-dicts are equal when their pairs are equal in order. If either one is a
   `CIMultiDict`, string keys are compared after `str.lower`; so equality between a plain
   and a case-insensitive multi-dict is not transitive.
-- Any other mapping (a `dict`, a `multidict.MultiDict`) is equal when every key has
-  exactly one value and the mappings are equal as dicts.
+- Any other mapping (a `dict`, a `multidict.MultiDict`) is equal when the multi-dict
+  has one value per key, both have the same `len()`, and `dict(other.items())` equals
+  the multi-dict's keys and values. String keys are compared exactly here, even for a
+  `CIMultiDict` and even against another library's case-insensitive mapping.
 - Multi-dicts are unhashable. `copy()` and `copy.copy` are shallow; `copy.deepcopy` and
   `pickle` work, keep subclass attributes and slots, and allow a multi-dict that contains
   itself. Pickles name `typedmultidict.MultiDict` / `CIMultiDict`; pickles written by 0.1.0
@@ -131,7 +136,7 @@ scenarios. Each reference is driven only through the calls whose meaning it shar
 | --- | --- |
 | `multidict.MultiDict`, `CIMultiDict` (C and pure Python) | `add`, `md[k] = v`, `getone`, `getall` (with a default), `popone`, `popall`, `popitem`, `setdefault`, `in`, `extend`, `update`, `merge`, pair order and spellings |
 | `werkzeug.datastructures.MultiDict` | `add`, `md[k] = v`, `get`, `getlist`, `pop`, `poplist`, `setdefault`, `in`, `update` (as our `extend`), keys and values per key |
-| `werkzeug.datastructures.Headers` | `add`, `set`, `get`, `getlist`, `pop`, `popitem`, `remove`, `setdefault`, `in`, `extend`, pair order and spellings |
+| `werkzeug.datastructures.Headers` | `add`, `set`, `get`, `getlist`, `pop`, `popitem` (when not empty), `remove`, `setdefault`, `in`, `extend`, pair order and spellings |
 | `requests.structures.CaseInsensitiveDict` | `md[k] = v`, `get`, `pop`, `setdefault`, `in`, key spelling and order |
 | `email.message.Message` | appending (its `msg[k] = v`), `get`, `get_all`, deleting a name, `in`, pair order |
 | `wsgiref.headers.Headers` | `add_header`, `get`, `get_all`, deleting a name, `setdefault`, `in`, pair order |
@@ -149,6 +154,12 @@ The deliberate differences, each shown live by `tests/test_reference_differences
 | `email.message` | `msg[k] = v` appends; deleting a missing name is silent | `md[k] = v` replaces; `del` raises `KeyError` |
 | `wsgiref.headers` | assignment moves the name to the end; deleting a missing name is silent | assignment keeps the place of the first pair; `del` raises `KeyError` |
 | requests | one value per name | every value is kept |
+| multidict | `MultiDict` refuses non-`str` keys | any hashable key; only `CIMultiDict` needs `str` |
+| multidict, Werkzeug `Headers`, requests, `email`, `wsgiref` | looking up a non-`str` name in a case-insensitive mapping raises | it is simply absent |
+| Werkzeug `Headers`, `email`, `wsgiref` | `len()` counts field lines | `len()` counts names |
+| Werkzeug `Headers` | `popitem()` when empty raises `IndexError`; values become `str` | `KeyError`; values are stored as given |
+| `email.message` | `get_all(missing)` is `None` | `getall(missing)` is `[]` |
+| multidict | a plain and a case-insensitive multi-dict are never equal | equal after folding string keys |
 
 The cited documentation (RFC 9110, the `collections.abc`, `email` and `wsgiref` pages,
 the multidict and Werkzeug docs, requests' `structures.py` at 2.34.2) is fetched by
