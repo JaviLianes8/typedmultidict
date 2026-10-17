@@ -146,14 +146,14 @@ print(headers.copy() == headers, headers.copy() is headers)  # True False
 
 Bulk input (`initial`, `extend`, `merge`, `update`) is read and checked in full first: an
 element that is not a pair raises `TypeError`, one of the wrong length raises
-`ValueError`, both with its position, and the mapping is left unchanged. Lookups,
-`add`, `popone` and `popitem` cost the same whatever the size; other removals cost time
-in proportion to the pairs they remove.
+`ValueError`, both with its position, and the mapping is left unchanged. Lookups cost
+the same whatever the size, and so do `add`, `popone` and `popitem` on average; other
+removals cost time in proportion to the pairs they remove.
 
 ### Compared with `multidict` and Werkzeug
 
-The method names and their behaviour follow the `multidict` package, with two
-differences that keep the type a consistent `Mapping`: `len()` counts keys (use
+The method names and their behaviour follow the `multidict` package, except where
+that would break the `Mapping` contract: `len()` counts keys (use
 `len(md.allitems())` for pairs), `keys` lists each key once, and `items` and `values`
 show the first value of each key, as Werkzeug's `MultiDict` does. `getall` returns an empty list for a missing
 key instead of raising, and `pop` removes every value of the key.
@@ -170,7 +170,7 @@ value is a common need. The established options each make a trade-off:
 
 - `multidict` (aio-libs) is fast and typed, but `len()`, `items()` and `values()` count
   every pair, so it is not a `Mapping` of keys; `getall` raises for a missing key and `pop`
-  removes a single value. Version 7.1.0 ships 170 compiled wheels next to its pure-Python one.
+  removes a single value. Version 7.1.0 ships 169 compiled wheels next to its pure-Python one.
 - Werkzeug's `MultiDict` comes with the Werkzeug WSGI library and stores values per key,
   so the order of pairs across keys is lost (`items(multi=True)` groups them by key), and
   its `update` appends.

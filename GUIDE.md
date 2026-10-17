@@ -67,7 +67,7 @@ of them agree on non-ASCII names as well: `"K"` (Kelvin sign) matches `"k"`, w
 
 - Every pair keeps the spelling it was added with; `md[k] = v` and `update` store the
   new spelling. Iteration and `to_dict` show each key in the spelling of its first pair.
-- Adding a key that is not a `str` (subclasses included) raises `TypeError`; looking one
+- Keys must be `str` or a `str` subclass. Adding any other key raises `TypeError`; looking one
   up finds nothing, so `5 in headers` is `False` and `headers.get(5)` is `None`.
 
 RFC 9110 section 5.3 makes the order of field lines with the same name significant, and
@@ -110,8 +110,8 @@ a length or a type (at most 40 characters of its name) and never includes a valu
 ## Cost
 
 Every operation costs time in proportion to the pairs it reads or removes: lookups,
-`in`, `len()`, `add`, `getone`, `popone` and `popitem` take constant time whatever the
-size; `getall`, `popall` and `del` are linear in the values of that one key; bulk calls are
+`in`, `len()` and `getone` take constant time whatever the size, and `add`, `popone` and
+`popitem` amortised constant time (holes are swept in bulk); `getall`, `popall` and `del` are linear in the values of that one key; bulk calls are
 linear in their input. Removed pairs leave holes that are swept out once they outnumber
 the live pairs, so deleting every key one by one is linear overall.
 
@@ -151,7 +151,7 @@ The deliberate differences, each shown live by `tests/test_reference_differences
 | requests | one value per name | every value is kept |
 
 The cited documentation (RFC 9110, the `collections.abc`, `email` and `wsgiref` pages,
-the multidict and Werkzeug docs, requests' `structures.py`) is fetched by
+the multidict and Werkzeug docs, requests' `structures.py` at 2.34.2) is fetched by
 `scripts/fetch_sources.py` into a git-ignored folder; `tests/sources/MANIFEST.json`
 records each URL, date, size, SHA-256 and licence, and `tests/test_sources.py` finds every
 fact quoted above in those copies.

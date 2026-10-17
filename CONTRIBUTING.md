@@ -11,8 +11,8 @@ pip install -r requirements-dev.txt
 ## Before you open a pull request
 
 - Keep public API in `src/typedmultidict/__init__.py`; internals live in `_`-prefixed modules.
-- Add a test for the behaviour you change. Tests inject time, disk and network; they
-  never touch the real thing.
+- Add a test for the behaviour you change. The default suite needs no network; only the
+  opt-in end-to-end test reaches PyPI.
 - Run `scripts/check.ps1` (format, lint, types, tests) and make sure it passes.
 - Set `TYPEDMULTIDICT_E2E=1` to also build the wheel and sdist, install them in fresh
   venvs, upgrade from the PyPI release and type-check a consumer against the install.

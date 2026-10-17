@@ -24,6 +24,8 @@ _MISSING: Any = _Missing()
 
 
 class _Mapping(_Storage[K, V]):
+    # get, pop and setdefault go through __getitem__, __setitem__ and __delitem__ exactly
+    # like the collections.abc mixins they replace, so subclass hooks see every call.
     @overload
     def get(self, key: K) -> V | None: ...
     @overload
@@ -39,8 +41,11 @@ class _Mapping(_Storage[K, V]):
         >>> md.get("a"), md.get("b"), md.get("b", 0)
         (1, None, 0)
         """
-        bucket = self._index.get(self._probe(key))
-        return default if bucket is None else bucket[0].value
+        # Through __getitem__, as the Mapping mixin does, so a subclass hook still applies.
+        try:
+            return self[key]
+        except KeyError:
+            return default
 
     def keys(self) -> KeysView[K]:
         """A live, set-like view of the keys, each once, in the order of its first pair.
@@ -86,15 +91,13 @@ class _Mapping(_Storage[K, V]):
         >>> md.pop("a"), md, md.pop("a", None)
         (1, MultiDict([('b', 2)]), None)
         """
-        token = self._probe(key)
-        bucket = self._index.get(token)
-        if bucket is None:
+        try:
+            first = self[key]
+        except KeyError:
             if default is _MISSING:
-                raise KeyError(key)
+                raise
             return default
-        first = bucket[0].value
-        self._trim(token, bucket, 0)
-        self._changed()
+        del self[key]
         return first
 
     @overload
@@ -110,10 +113,10 @@ class _Mapping(_Storage[K, V]):
         >>> md.setdefault("a", 9), md.setdefault("b", 9), md
         (1, 9, MultiDict([('a', 1), ('a', 2), ('b', 9)]))
         """
-        bucket = self._index.get(self._probe(key))
-        if bucket is not None:
-            return bucket[0].value
-        self._append([(self._token(key), key, default)])
+        try:
+            return self[key]
+        except KeyError:
+            self[key] = default
         return default
 
     def clear(self) -> None:

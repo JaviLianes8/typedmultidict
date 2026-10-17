@@ -46,7 +46,7 @@ SOURCES = {
         "BSD-3-Clause (pallets/werkzeug)",
     ),
     "requests-structures.py.txt": (
-        "https://raw.githubusercontent.com/psf/requests/v2.32.3/src/requests/structures.py",
+        "https://raw.githubusercontent.com/psf/requests/v2.34.2/src/requests/structures.py",
         "Apache-2.0 (psf/requests)",
     ),
 }

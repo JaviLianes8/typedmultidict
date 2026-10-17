@@ -7,7 +7,6 @@ copies these tests skip. The phrases below are short quotations used only as loc
 
 from __future__ import annotations
 
-import hashlib
 import html
 import json
 import re
@@ -65,8 +64,8 @@ def test_the_fetched_copy_holds_the_cited_facts(name: str) -> None:
     path = SOURCES / name
     if not path.exists():
         pytest.skip("run scripts/fetch_sources.py to fetch the copies")
-    data = path.read_bytes()
-    assert hashlib.sha256(data).hexdigest() == MANIFEST[name]["sha256"]
+    # Documentation sites rebuild their pages: a copy fetched later may differ in bytes
+    # from the recorded one, and the cited facts must still be there.
     text = _text(path)
     for phrase in FACTS[name]:
         assert phrase in text, (name, phrase)

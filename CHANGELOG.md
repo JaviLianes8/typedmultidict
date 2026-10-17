@@ -31,6 +31,10 @@ behaviour described in the README and the guide. Later 1.x releases only add.
   of a tuple or list and says "3 or more" for other iterables.
 - Error messages show at most 40 characters of a type name, and never the offending value.
 - The version has a single source (`typedmultidict.__version__`).
+- `get`, `pop`, `setdefault`, `keys`, `items`, `values` and `clear` are now written out on
+  the class with their own docstrings. They behave as the `collections.abc` mixins did,
+  and `get`, `pop` and `setdefault` still go through `__getitem__`, `__setitem__` and
+  `__delitem__`, so a subclass that overrides those hooks sees the same calls as before.
 
 ## [0.2.0] - 2026-10-13
 
