@@ -6,6 +6,32 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-17
+
+The public API is now stable: `MultiDict`, `CIMultiDict`, `AllItemsView` and
+`AllValuesView`, every method name, signature and default, the error types and the
+behaviour described in the README and the guide. Later 1.x releases only add.
+
+### Added
+
+- `AllItemsView` and `AllValuesView` are exported, so the views returned by `allitems()`
+  and `allvalues()` can be named in annotations.
+- `getall(key, default)` returns `default` for an absent key, as in `multidict`;
+  `getall(key)` still returns an empty list.
+- Every public class and method carries a docstring with examples that the test suite
+  runs.
+
+### Changed (upgrading from 0.2.0)
+
+- Removing pairs no longer scans the whole multi-dict: `del md[key]`, `pop`, `popone`,
+  `popall`, `popitem`, assignment and `update` cost time in proportion to the pairs they
+  remove. Deleting every key one by one is linear overall instead of quadratic.
+- Bulk input reads at most three items of each element, so an endless or huge element
+  fails at once with `ValueError` instead of hanging. The message gives the exact length
+  of a tuple or list and says "3 or more" for other iterables.
+- Error messages show at most 40 characters of a type name, and never the offending value.
+- The version has a single source (`typedmultidict.__version__`).
+
 ## [0.2.0] - 2026-10-13
 
 ### Added

@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import copy as _copy
-from collections.abc import Hashable
+from collections.abc import Hashable, Iterator
 from typing import TYPE_CHECKING, Any, TypeVar, overload
 
 from ._pairs import MultiDictInput, read_pairs
 from ._storage import _Entry, _Storage
-from ._views import AllItemsView, AllValuesView
+from ._values import _MultiValues
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -17,18 +17,25 @@ if TYPE_CHECKING:
 
 K = TypeVar("K", bound=Hashable)
 V = TypeVar("V")
-T = TypeVar("T")
 Self = TypeVar("Self", bound="MultiDict[Any, Any]")
 
-_MISSING: Any = object()
 
-
-class MultiDict(_Storage[K, V]):
+class MultiDict(_MultiValues[K, V]):
     """A typed, insertion-ordered multi-value mapping.
 
     Mapping operations act on the first value of each key, so the type behaves like a
     normal mapping (``len()`` counts keys). The multi-value surface (``add``, ``getall``,
-    ``allitems`` and friends) sees every stored pair in insertion order.
+    ``allitems`` and friends) sees every stored pair in insertion order. ``initial`` is a
+    mapping, a multi-dict (every pair is copied) or an iterable of ``(key, value)`` pairs.
+
+    >>> from typedmultidict import MultiDict
+    >>> md = MultiDict([("tag", "a"), ("page", "2"), ("tag", "b")])
+    >>> md["tag"], md.getall("tag"), len(md), "page" in md
+    ('a', ['a', 'b'], 2, True)
+    >>> md["tag"] = "c"
+    >>> del md["page"]
+    >>> md, list(md), md == {"tag": "c"}
+    (MultiDict([('tag', 'c')]), ['tag'], True)
     """
 
     def __init__(self, initial: MultiDictInput[K, V] | None = None) -> None:
@@ -42,17 +49,38 @@ class MultiDict(_Storage[K, V]):
         return [(self._token(key), key, value) for key, value in pairs]
 
     def add(self, key: K, value: V) -> None:
-        """Append another value for ``key`` without replacing existing ones."""
+        """Append another value for ``key`` without replacing existing ones.
+
+        >>> from typedmultidict import MultiDict
+        >>> md = MultiDict([("a", 1)])
+        >>> md.add("a", 2)
+        >>> md
+        MultiDict([('a', 1), ('a', 2)])
+        """
         self._append([(self._token(key), key, value)])
 
     def extend(self, other: MultiDictInput[K, V]) -> None:
-        """Append every pair of a mapping, multi-dict or iterable of pairs."""
+        """Append every pair of a mapping, multi-dict or iterable of pairs.
+
+        >>> from typedmultidict import MultiDict
+        >>> md = MultiDict([("a", 1)])
+        >>> md.extend([("a", 2), ("b", 3)])
+        >>> md
+        MultiDict([('a', 1), ('a', 2), ('b', 3)])
+        """
         self._append(self._collect(other, {}))
 
     def merge(self, other: MultiDictInput[K, V]) -> None:
-        """Append the pairs whose key is not present yet; keys already here are skipped."""
-        present = set(self._index)
-        self._append([item for item in self._collect(other, {}) if item[0] not in present])
+        """Append the pairs whose key is not present yet; keys already here are skipped.
+
+        >>> from typedmultidict import MultiDict
+        >>> md = MultiDict([("a", 1)])
+        >>> md.merge([("a", 2), ("b", 3), ("b", 4)])
+        >>> md
+        MultiDict([('a', 1), ('b', 3), ('b', 4)])
+        """
+        incoming = self._collect(other, {})
+        self._append([item for item in incoming if item[0] not in self._index])
 
     @overload
     def update(self, other: SupportsKeysAndGetItem[K, V], /) -> None: ...
@@ -71,100 +99,49 @@ class MultiDict(_Storage[K, V]):
         """Replace the values of every incoming key, reusing the old positions in order.
 
         Extra new values go to the end, extra old values are removed, and keys that do
-        not appear in ``other`` are left alone.
+        not appear in ``other`` (or as keyword arguments) are left alone.
+
+        >>> from typedmultidict import MultiDict
+        >>> md = MultiDict([("a", 1), ("b", 2), ("a", 3)])
+        >>> md.update([("a", 7), ("a", 8), ("a", 9)], b=0)
+        >>> md
+        MultiDict([('a', 7), ('b', 0), ('a', 8), ('a', 9)])
         """
         # Plan first: every hash and key comparison happens before anything changes.
         used: dict[Hashable, int] = {}
+        cursors: dict[Hashable, Iterator[_Entry]] = {}
         reused: list[tuple[_Entry, K, V]] = []
         fresh: list[tuple[Hashable, K, V]] = []
         for token, key, value in self._collect(other, kwargs):
-            slot = used.get(token, 0)
-            used[token] = slot + 1
-            entries = self._index.get(token, [])
-            if slot < len(entries):
-                reused.append((entries[slot], key, value))
-            else:
+            used[token] = used.get(token, 0) + 1
+            cursor = cursors.get(token)
+            if cursor is None:
+                cursor = cursors[token] = iter(self._index.get(token, ()))
+            entry = next(cursor, None)
+            if entry is None:
                 fresh.append((token, key, value))
-        stale = [entry for token, n in used.items() for entry in self._index.get(token, [])[n:]]
+            else:
+                reused.append((entry, key, value))
+        stale = [
+            (token, bucket, n)
+            for token, n in used.items()
+            if (bucket := self._index.get(token)) is not None and len(bucket) > n
+        ]
         self._append(fresh)  # undoes itself if it fails; nothing after it can fail
         for entry, key, value in reused:
             entry.key = key
             entry.value = value
-        self._drop(stale)
-
-    @overload
-    def getone(self, key: K) -> V: ...
-    @overload
-    def getone(self, key: K, default: T) -> V | T: ...
-
-    def getone(self, key: K, default: Any = _MISSING) -> Any:
-        """Return the first value for ``key``, else ``default`` or raise ``KeyError``."""
-        entries = self._index.get(self._probe(key))
-        if entries is not None:
-            return entries[0].value
-        if default is _MISSING:
-            raise KeyError(key)
-        return default
-
-    def getall(self, key: K) -> list[V]:
-        """Return a new list of every value for ``key`` in order, empty if absent."""
-        return [entry.value for entry in self._index.get(self._probe(key), ())]
-
-    @overload
-    def popone(self, key: K) -> V: ...
-    @overload
-    def popone(self, key: K, default: T) -> V | T: ...
-
-    def popone(self, key: K, default: Any = _MISSING) -> Any:
-        """Remove and return the first value for ``key``; later values stay."""
-        entries = self._index.get(self._probe(key))
-        if entries is None:
-            if default is _MISSING:
-                raise KeyError(key)
-            return default
-        first = entries[0]
-        self._drop([first])
-        return first.value
-
-    @overload
-    def popall(self, key: K) -> list[V]: ...
-    @overload
-    def popall(self, key: K, default: T) -> list[V] | T: ...
-
-    def popall(self, key: K, default: Any = _MISSING) -> Any:
-        """Remove and return every value for ``key``; raise ``KeyError`` if absent."""
-        entries = self._index.get(self._probe(key))
-        if entries is None:
-            if default is _MISSING:
-                raise KeyError(key)
-            return default
-        self._drop(list(entries))
-        return [entry.value for entry in entries]
-
-    def popitem(self) -> tuple[K, V]:
-        """Remove and return the last pair added; other values of its key stay."""
-        if not self._entries:
-            raise KeyError("popitem(): multi-dict is empty")
-        last = self._entries.pop()
-        entries = self._index[last.token]
-        entries.pop()
-        if not entries:
-            del self._index[last.token]
-        self._version += 1
-        return last.key, last.value
-
-    def allitems(self) -> AllItemsView[K, V]:
-        """A live view of every ``(key, value)`` pair in insertion order."""
-        return AllItemsView(self)
-
-    def allvalues(self) -> AllValuesView[V]:
-        """A live view of every value in insertion order."""
-        return AllValuesView(self)
-
-    def to_dict(self) -> dict[K, list[V]]:
-        """A new ``dict`` from each key (first spelling) to a new list of its values."""
-        return {key: self.getall(key) for key in self}
+        for token, bucket, n in stale:
+            self._trim(token, bucket, n)
+        self._changed()
 
     def copy(self: Self) -> Self:
-        """A shallow copy of the same type; values are shared, not copied."""
+        """A shallow copy of the same type; values are shared, not copied.
+
+        >>> from typedmultidict import MultiDict
+        >>> md = MultiDict([("a", [1])])
+        >>> twin = md.copy()
+        >>> twin == md, twin is md, twin["a"] is md["a"]
+        (True, False, True)
+        """
         return _copy.copy(self)

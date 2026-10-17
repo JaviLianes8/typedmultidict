@@ -47,11 +47,11 @@ def test_the_api_table_lists_every_public_name_and_method() -> None:
         assert re.search(rf"`(md\.)?{method}\b", table), method
 
 
-def test_version_matches_pyproject_and_changelog() -> None:
+def test_version_has_one_source_and_a_changelog_entry() -> None:
     text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    match = re.search(r'^version = "([^"]+)"$', text, flags=re.MULTILINE)
-    assert match is not None
-    assert match.group(1) == typedmultidict.__version__
+    assert 'dynamic = ["version"]' in text
+    assert 'path = "src/typedmultidict/__init__.py"' in text
+    assert re.search(r"^version\s*=", text, flags=re.MULTILINE) is None
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     assert f"## [{typedmultidict.__version__}]" in changelog
 

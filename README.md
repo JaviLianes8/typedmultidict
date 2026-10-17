@@ -125,11 +125,11 @@ print(headers.copy() == headers, headers.copy() is headers)  # True False
 | `merge(other)` | Appends the pairs whose key is not present yet. |
 | `update(other=(), /, **kwargs)` | Replaces the values of each incoming key in place. |
 | `getone(key[, default])` | First value, else `default`, else `KeyError`. |
-| `getall(key)` | New list of every value of `key`, empty if absent. |
+| `getall(key[, default])` | New list of every value of `key`; if absent, `default` when given, else an empty list. |
 | `popone(key[, default])` | Removes and returns the first value only. |
 | `popall(key[, default])` | Removes and returns every value as a list. |
 | `popitem()` | Removes and returns the last pair added (`KeyError` when empty). |
-| `allitems()`, `allvalues()` | Live views of every pair or value; `len()` counts pairs. |
+| `allitems()`, `allvalues()` | Live views of every pair or value (`AllItemsView`, `AllValuesView`); `len()` counts pairs. |
 | `to_dict()` | New `dict` from each key to a new list of its values. |
 | `copy()`, `clear()` | Shallow copy of the same class; remove everything. |
 

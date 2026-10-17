@@ -8,12 +8,12 @@ if TYPE_CHECKING:
     from ._storage import _Storage
 
 # Rebuilt from the pairs, never copied as they are.
-_OWN = frozenset({"_entries", "_index", "_version"})
+_OWN = frozenset({"_entries", "_holes", "_index", "_version"})
 
 
 def state_of(obj: _Storage[Any, Any]) -> tuple[Any, ...]:
     """The pairs, the instance attributes and any subclass slots, in that order."""
-    pairs = [(entry.key, entry.value) for entry in obj._entries]
+    pairs = [(entry.key, entry.value) for entry in obj._live()]
     attrs = {name: value for name, value in vars(obj).items() if name not in _OWN}
     slots = {name: getattr(obj, name) for name in _slot_names(type(obj)) if hasattr(obj, name)}
     return pairs, attrs or None, slots or None
