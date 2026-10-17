@@ -2,6 +2,17 @@
 
 Pure-Python typed ordered multi-value dictionary with a case-insensitive variant.
 
+A `MultiDict` keeps every `(key, value)` pair of a query string or a header block, in
+order, and still behaves as a normal `Mapping` over the first value of each key.
+`CIMultiDict` compares keys case-insensitively, as HTTP field names require (RFC 9110,
+section 5.1). Zero dependencies, `mypy --strict` clean, and every operation costs time in
+proportion to the pairs it touches.
+
+Read the [guide](https://github.com/JaviLianes8/typedmultidict/blob/main/GUIDE.md) for
+every rule and the comparison with other implementations, and the
+[changelog](https://github.com/JaviLianes8/typedmultidict/blob/main/CHANGELOG.md) for what
+changed between releases.
+
 ## Install
 
 ```
@@ -125,26 +136,27 @@ print(headers.copy() == headers, headers.copy() is headers)  # True False
 | `merge(other)` | Appends the pairs whose key is not present yet. |
 | `update(other=(), /, **kwargs)` | Replaces the values of each incoming key in place. |
 | `getone(key[, default])` | First value, else `default`, else `KeyError`. |
-| `getall(key)` | New list of every value of `key`, empty if absent. |
+| `getall(key[, default])` | New list of every value of `key`; if absent, `default` when given, else an empty list. |
 | `popone(key[, default])` | Removes and returns the first value only. |
 | `popall(key[, default])` | Removes and returns every value as a list. |
 | `popitem()` | Removes and returns the last pair added (`KeyError` when empty). |
-| `allitems()`, `allvalues()` | Live views of every pair or value; `len()` counts pairs. |
+| `allitems()`, `allvalues()` | Live views of every pair or value (`AllItemsView`, `AllValuesView`); `len()` counts pairs. |
 | `to_dict()` | New `dict` from each key to a new list of its values. |
 | `copy()`, `clear()` | Shallow copy of the same class; remove everything. |
 
 Bulk input (`initial`, `extend`, `merge`, `update`) is read and checked in full first: an
 element that is not a pair raises `TypeError`, one of the wrong length raises
-`ValueError`, both with its position, and the mapping is left unchanged. Lookups cost the
-same whatever the size; removals are linear in the number of pairs.
+`ValueError`, both with its position, and the mapping is left unchanged. Lookups cost
+the same whatever the size, and so do `add`, `popone` and `popitem` on average; other
+removals cost time in proportion to the pairs they remove.
 
 ### Compared with `multidict` and Werkzeug
 
-The method names and their behaviour follow the `multidict` package, with two
-differences that keep the type a consistent `Mapping`: `len()` counts keys (use
-`len(md.allitems())` for pairs), and `keys`, `items` and `values` show the first value of
-each key, as Werkzeug's `MultiDict` does. `getall` returns an empty list for a missing
-key instead of raising, and `pop` removes every value of the key.
+The method names and their behaviour follow the `multidict` package, except where
+that would break the `Mapping` contract: `len()` counts keys (use
+`len(md.allitems())` for pairs), and `items` and `values` show the first value of each
+key, as Werkzeug's `MultiDict` does. `getall` returns an empty list for a missing key
+instead of raising, and `pop` removes every value of the key.
 
 Like `dict`, a multi-dict is not safe to change from several threads at once without a
 lock. Equality between a plain and a case-insensitive multi-dict folds case, so it is not
@@ -154,20 +166,25 @@ compared as a plain mapping.
 ## Why
 
 HTTP headers and query strings routinely carry repeated keys, so a mapping that keeps every
-value is a common need. The existing options each fall short for a plain, typed project:
+value is a common need. The established options each make a trade-off:
 
-- `multidict` (the aiohttp one) is a C extension; its pure-Python fallback runs many times
-  slower and still needs a build step for the fast path.
-- `orderedmultidict` depends on `six` and ships no type hints.
-- The `MultiDict` types in `werkzeug` and `starlette` come bundled with a whole framework.
+- `multidict` (aio-libs) is fast and typed, but `len()`, `items()` and `values()` count
+  every pair, so it is not a `Mapping` of keys; `getall` raises for a missing key and `pop`
+  removes a single value. Version 7.1.0 ships 169 compiled wheels next to its pure-Python one.
+- Werkzeug's `MultiDict` comes with the Werkzeug WSGI library and stores values per key,
+  so the order of pairs across keys is lost (`items(multi=True)` groups them by key), and
+  its `update` appends.
+- `orderedmultidict` depends on `six`; requests' `CaseInsensitiveDict` keeps one value per
+  name; `email.message` appends on assignment.
 
-`typedmultidict` is a single, standalone, fully typed implementation with `py.typed`, zero
-runtime dependencies and no compilation. Reach for it when you want multi-value semantics
-and `mypy --strict` support without pulling in a framework or a native wheel.
+`typedmultidict` is a single, standalone implementation with zero runtime dependencies
+and `py.typed`: a true `MutableMapping`, the full multi-value API, pair order kept exactly,
+and behaviour checked call by call against all of the above (see the
+[guide](https://github.com/JaviLianes8/typedmultidict/blob/main/GUIDE.md)).
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](https://github.com/JaviLianes8/typedmultidict/blob/main/LICENSE).
 
 ## Links
 

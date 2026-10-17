@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import copyreg
 import reprlib
+from collections import deque
 from collections.abc import Hashable, Iterator, Mapping, MutableMapping
 from typing import Any, ClassVar, TypeVar
 
+from ._guard import exclusive
 from ._state import restore, state_of
 
 K = TypeVar("K", bound=Hashable)
@@ -15,28 +17,36 @@ V = TypeVar("V")
 _CHANGED = "multi-dict changed during iteration"
 # Rebuilds with cls.__new__(cls); pickle encodes it as the compact NEWOBJ opcode.
 _NEWOBJ: Any = getattr(copyreg, "__newobj__")  # noqa: B009
+# Holes left by removals are swept out once they outnumber the live pairs (and this floor).
+_SWEEP_FLOOR = 8
 
 
 class _Entry:
-    __slots__ = ("key", "token", "value")
+    __slots__ = ("key", "pos", "token", "value")
 
-    def __init__(self, token: Hashable, key: Any, value: Any) -> None:
+    def __init__(self, token: Hashable, key: Any, value: Any, pos: int) -> None:
         self.token = token
         self.key = key
         self.value = value
+        self.pos = pos
 
 
 class _Storage(MutableMapping[K, V]):
-    # Pairs live in one ordered list; the index maps each key token to its entries in order,
-    # so lookups never scan the list. Only removals pay a linear pass. No __slots__: 0.1.0
-    # instances took extra attributes and weak references, and still do.
+    # Pairs live in one ordered list where a removed pair leaves a hole (None) until a sweep;
+    # the index maps each key token to its entries in order. Every removal takes the first
+    # or the last entries of a key, so each operation costs time in proportion to the pairs
+    # it reads or removes. No __slots__: 0.1.0 instances took extra attributes and weak
+    # references, and still do.
 
     _folds_case: ClassVar[bool] = False
+    _busy = False  # set while a write runs; see _guard
 
     def _setup(self) -> None:
-        self._entries: list[_Entry] = []
-        self._index: dict[Hashable, list[_Entry]] = {}
-        self._version = 0
+        self._entries: list[_Entry | None] = []
+        self._index: dict[Hashable, deque[_Entry]] = {}
+        self._holes = 0
+        # Never reset to a value a live iterator could have seen.
+        self._version: int = getattr(self, "_version", 0) + 1
 
     def _token(self, key: K) -> Hashable:
         """The identity a key is stored under; raises for keys this mapping refuses."""
@@ -46,69 +56,89 @@ class _Storage(MutableMapping[K, V]):
         """The identity to look a key up by; a refused key matches nothing."""
         return key
 
+    def _live(self) -> Iterator[_Entry]:
+        return (entry for entry in self._entries if entry is not None)
+
+    def _count(self) -> int:
+        return len(self._entries) - self._holes
+
     def _append(self, pairs: list[tuple[Hashable, K, V]]) -> None:
-        added: list[_Entry] = []
+        added: list[tuple[_Entry, deque[_Entry]]] = []
+        start = len(self._entries)
         try:
             for token, key, value in pairs:
-                entry = _Entry(token, key, value)
+                entry = _Entry(token, key, value, start + len(added))
                 # A key whose __hash__ or __eq__ raises fails here; undo what came before.
-                self._index.setdefault(token, []).append(entry)
-                added.append(entry)
+                bucket = self._index.setdefault(token, deque())
+                bucket.append(entry)
+                added.append((entry, bucket))
         except BaseException:
-            for entry in reversed(added):
-                self._index[entry.token].pop()
-                if not self._index[entry.token]:
+            for entry, bucket in reversed(added):
+                bucket.pop()
+                if not bucket:
                     del self._index[entry.token]
             raise
-        self._entries.extend(added)
+        self._entries.extend(entry for entry, _ in added)
         self._version += 1
 
-    def _drop(self, doomed: list[_Entry]) -> None:
-        if not doomed:
-            return
-        gone = {id(entry) for entry in doomed}
-        self._entries = [entry for entry in self._entries if id(entry) not in gone]
-        for token in {entry.token for entry in doomed}:
-            kept = [entry for entry in self._index[token] if id(entry) not in gone]
-            if kept:
-                self._index[token] = kept
-            else:
-                del self._index[token]
+    def _hole(self, entry: _Entry) -> None:
+        self._entries[entry.pos] = None
+        self._holes += 1
+
+    def _changed(self) -> None:
         self._version += 1
+        if self._holes > _SWEEP_FLOOR and self._holes * 2 > len(self._entries):
+            live = list(self._live())
+            for pos, entry in enumerate(live):
+                entry.pos = pos
+            self._entries = live  # type: ignore[assignment]
+            self._holes = 0
+
+    def _trim(self, token: Hashable, bucket: deque[_Entry], keep: int) -> None:
+        """Remove the entries of one key beyond its first ``keep``."""
+        if not keep:
+            del self._index[token]  # compares keys: done before anything else changes
+        while len(bucket) > keep:
+            self._hole(bucket.pop())
 
     def _iterate(self, version: int) -> Iterator[_Entry]:
         # Checked before each step, so a change made between iter() and next() is caught.
         for entry in self._entries:
             if self._version != version:
                 raise RuntimeError(_CHANGED)
-            yield entry
+            if entry is not None:
+                yield entry
         if self._version != version:
             raise RuntimeError(_CHANGED)
 
     def __getitem__(self, key: K) -> V:
-        entries = self._index.get(self._probe(key))
-        if entries is None:
+        bucket = self._index.get(self._probe(key))
+        if bucket is None:
             raise KeyError(key)
-        value: V = entries[0].value
+        value: V = bucket[0].value
         return value
 
+    @exclusive
     def __setitem__(self, key: K, value: V) -> None:
         token = self._token(key)
-        entries = self._index.get(token)
-        if entries is None:
+        bucket = self._index.get(token)
+        if bucket is None:
             self._append([(token, key, value)])
             return
-        first = entries[0]
+        first = bucket[0]
         first.key = key
         first.value = value
-        self._drop(entries[1:])
-        self._version += 1
+        self._trim(token, bucket, 1)
+        self._changed()
 
+    @exclusive
     def __delitem__(self, key: K) -> None:
-        entries = self._index.get(self._probe(key))
-        if entries is None:
+        token = self._probe(key)
+        bucket = self._index.get(token)
+        if bucket is None:
             raise KeyError(key)
-        self._drop(list(entries))
+        self._trim(token, bucket, 0)
+        self._changed()
 
     def __contains__(self, key: object) -> bool:
         return self._probe(key) in self._index
@@ -127,26 +157,21 @@ class _Storage(MutableMapping[K, V]):
     def __len__(self) -> int:
         return len(self._index)
 
-    def clear(self) -> None:
-        self._entries = []
-        self._index = {}
-        self._version += 1
-
     def __eq__(self, other: object) -> bool:
         if isinstance(other, _Storage):
             fold = self._folds_case or other._folds_case
-            return _compared(self._entries, fold) == _compared(other._entries, fold)
+            return _compared(self, fold) == _compared(other, fold)
         if isinstance(other, Mapping):
-            if not len(self._entries) == len(self._index) == len(other):
+            if not self._count() == len(self._index) == len(other):
                 return False
-            return {e.key: e.value for e in self._entries} == dict(other.items())
+            return {e.key: e.value for e in self._live()} == dict(other.items())
         return NotImplemented
 
     __hash__ = None  # type: ignore[assignment]
 
     @reprlib.recursive_repr()
     def __repr__(self) -> str:
-        pairs = [(entry.key, entry.value) for entry in self._entries]
+        pairs = [(entry.key, entry.value) for entry in self._live()]
         return f"{type(self).__name__}({pairs!r})"
 
     def __reduce__(self) -> tuple[Any, ...]:
@@ -154,14 +179,15 @@ class _Storage(MutableMapping[K, V]):
         # memoised before its pairs are copied. Built with __new__: no __init__ is called.
         return (_NEWOBJ, (type(self),), state_of(self))
 
+    @exclusive
     def __setstate__(self, state: Any) -> None:
         restore(self, state)
 
 
-def _compared(entries: list[_Entry], fold: bool) -> list[tuple[Any, Any]]:
+def _compared(storage: _Storage[Any, Any], fold: bool) -> list[tuple[Any, Any]]:
     if not fold:
-        return [(entry.token, entry.value) for entry in entries]
+        return [(entry.token, entry.value) for entry in storage._live()]
     return [
         (str.lower(entry.key) if isinstance(entry.key, str) else entry.key, entry.value)
-        for entry in entries
+        for entry in storage._live()
     ]
