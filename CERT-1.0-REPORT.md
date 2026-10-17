@@ -22,6 +22,16 @@ e2e skipped without its opt-in variable), `ruff check .` and `mypy --strict src 
 exit 0. PyPI has 0.2.0 only. Deleting 20 000 keys one at a time took 10.1 s and
 20 000 `popone` calls on one key 18.3 s: every removal rebuilt the whole pair list.
 
+## Supported Pythons (item 10)
+
+`requires-python = ">=3.10"`. Wheel and sdist built from a fresh clone at 3d67cc4,
+`twine check --strict` passed; the sdist's suite run against the installed wheel (`-I`,
+source path removed) with the references, mypy and build installed,
+`TYPEDMULTIDICT_E2E=1`, `TYPEDMULTIDICT_LIVE_ORACLES=1` and the fetched sources present,
+so nothing skips: 392 passed on each of CPython 3.10.19, 3.11.5, 3.12.12, 3.13.2, 3.14.2
+and 3.14.2 free-threaded (each test limited to 180 s). 3.8 and 3.9 are installed but
+below `requires-python`.
+
 ## API review (items 1 to 5)
 
 Kept from 0.2.0 with the same names, signatures and defaults: `MultiDict(initial=None)`,
