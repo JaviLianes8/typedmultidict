@@ -39,11 +39,14 @@ class MultiDict(_MultiValues[K, V]):
     (MultiDict([('tag', 'c')]), ['tag'], True)
     """
 
-    @exclusive
     def __init__(self, initial: MultiDictInput[K, V] | None = None) -> None:
-        pairs = [] if initial is None else self._collect(initial, {})
-        self._setup()  # only after the input is read, so a failure changes nothing
-        self._append(pairs)
+        self._reset()
+        if initial is not None:
+            self.extend(initial)  # through extend, so a subclass hook sees the input
+
+    @exclusive
+    def _reset(self) -> None:
+        self._setup()
 
     def _collect(self, source: object, extra: dict[str, Any]) -> list[tuple[Hashable, K, V]]:
         pairs = read_pairs(source, _Storage)

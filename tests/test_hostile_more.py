@@ -53,3 +53,16 @@ def test_mapping_views_keep_the_standard_names_and_pickle() -> None:
     assert repr(md.values()) == "ValuesView(MultiDict([('a', 1)]))"
     for view in (md.keys(), md.items(), md.values()):
         assert list(pickle.loads(pickle.dumps(view))) == list(view)
+
+
+def test_the_constructor_goes_through_extend_so_subclass_hooks_see_its_input() -> None:
+    class Checked(MultiDict[str, int]):
+        def extend(self, other: Any) -> None:
+            pairs = list(other)
+            if any(value < 0 for _, value in pairs):
+                raise ValueError("negative")
+            super().extend(pairs)
+
+    with pytest.raises(ValueError, match="negative"):
+        Checked([("a", -1)])
+    assert list(Checked([("a", 1)]).allitems()) == [("a", 1)]
