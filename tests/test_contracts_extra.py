@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tracemalloc
+from collections.abc import Callable
 from typing import Any
 
 import pytest
@@ -106,3 +107,32 @@ def test_key_error_carries_the_key_passed(call: Any) -> None:
     with pytest.raises(KeyError) as caught:
         call(MultiDict([("a", 1)]))
     assert caught.value.args == ("k",)
+
+
+def test_unhashable_keys_raise_type_error_through_get_pop_and_setdefault() -> None:
+    md: MultiDict[Any, int] = MultiDict()
+    calls: list[Callable[[], object]] = [
+        lambda: md.get([]), lambda: md.pop([], 1), lambda: md.setdefault([], 1)
+    ]  # fmt: skip
+    for call in calls:
+        with pytest.raises(TypeError):
+            call()
+    assert not md
+
+
+class _Picky(MultiDict[str, int]):
+    def __getitem__(self, key: str) -> int:
+        if key == "bad":
+            raise ValueError("refused")
+        return super().__getitem__(key)
+
+
+def test_only_key_error_from_the_item_hook_means_absent() -> None:
+    md = _Picky()
+    calls: list[Callable[[], object]] = [
+        lambda: md.get("bad"), lambda: md.pop("bad", 1), lambda: md.setdefault("bad", 1)
+    ]  # fmt: skip
+    for call in calls:
+        with pytest.raises(ValueError, match="refused"):
+            call()
+    assert not md
