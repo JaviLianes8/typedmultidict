@@ -8,14 +8,15 @@ from typing import Any, TypeVar, cast
 
 F = TypeVar("F", bound=Callable[..., Any])
 
-_REENTERED = "multi-dict changed by a key comparison during a write"
+_REENTERED = "multi-dict written to while one of its writes was running"
 
 
 def exclusive(method: F) -> F:
     """Run a writing method, refusing any write that starts before it ends.
 
-    A key's ``__eq__`` or ``__hash__`` runs user code in the middle of a write; if that code
-    writes to the same multi-dict, it gets ``RuntimeError`` instead of corrupting it.
+    A key's ``__eq__`` or ``__hash__``, or the input being read, runs user code in the
+    middle of a write; if that code writes to the same multi-dict, it gets ``RuntimeError``
+    instead of corrupting it.
     """
 
     @functools.wraps(method)

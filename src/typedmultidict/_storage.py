@@ -179,6 +179,7 @@ class _Storage(MutableMapping[K, V]):
         # memoised before its pairs are copied. Built with __new__: no __init__ is called.
         return (_NEWOBJ, (type(self),), state_of(self))
 
+    @exclusive
     def __setstate__(self, state: Any) -> None:
         restore(self, state)
 

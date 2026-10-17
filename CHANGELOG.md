@@ -37,6 +37,8 @@ behaviour described in the README and the guide. Later 1.x releases only add.
 - `keys()`, `items()` and `values()` iterators raise `RuntimeError` for a change made
   between `iter()` and the first item, as `iter(md)` and `dict` views do.
 - `repr` of a view held inside its own multi-dict prints `...` instead of recursing.
+- Calling `__init__` again on a multi-dict reads the new input before clearing, so bad
+  input leaves it unchanged. Views from `keys()`, `items()` and `values()` still pickle.
 - `get`, `pop`, `setdefault`, `keys`, `items`, `values` and `clear` are now written out on
   the class with their own docstrings. They behave as the `collections.abc` mixins did,
   and `get`, `pop` and `setdefault` still go through `__getitem__`, `__setitem__` and

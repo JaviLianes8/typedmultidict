@@ -67,7 +67,7 @@ def test_a_key_comparison_that_writes_is_refused_and_leaves_no_damage(
     try:
         write(md)
     except RuntimeError as error:
-        assert "changed by a key comparison" in str(error)
+        assert "while one of its writes was running" in str(error)
         assert list(md.allitems()) == before
     else:
         assert _Meddler.armed, "the write ran although the comparison wrote"
