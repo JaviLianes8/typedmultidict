@@ -24,7 +24,8 @@ behaviour described in the README and the guide. Later 1.x releases only add.
 ### Changed (upgrading from 0.2.0)
 
 - Removing pairs no longer scans the whole multi-dict: `del md[key]`, `pop`, `popone`,
-  `popall`, assignment and `update` cost time in proportion to the pairs they remove. Deleting every key one by one is linear overall instead of quadratic.
+  `popall`, assignment and `update` cost time in proportion to the pairs they remove.
+  Deleting every key one by one is linear overall instead of quadratic.
 - Bulk input reads at most three items of each element, so an endless or huge element
   fails at once with `ValueError` instead of hanging. The message gives the exact length
   of a tuple or list and says "3 or more" for other iterables.

@@ -31,7 +31,10 @@ def test_project_metadata_is_complete_and_stable() -> None:
     assert project["dynamic"] == ["version"] and project["dependencies"] == []
     assert project["requires-python"] == ">=3.10" and project["license"] == "MIT"
     assert project["readme"] == "README.md" and project["license-files"] == ["LICENSE"]
-    assert {"multidict", "headers", "case-insensitive"} <= set(project["keywords"])
+    assert project["keywords"] == [
+        "multidict", "multi-value", "dictionary", "mapping", "headers", "http",
+        "case-insensitive", "query-string", "typed",
+    ]  # fmt: skip
     classifiers = project["classifiers"]
     assert "Development Status :: 5 - Production/Stable" in classifiers
     assert "Typing :: Typed" in classifiers
@@ -48,8 +51,10 @@ def test_project_metadata_is_complete_and_stable() -> None:
 
 def test_the_sdist_takes_only_the_listed_paths() -> None:
     only = _project()["tool"]["hatch"]["build"]["targets"]["sdist"]["only-include"]
-    assert "src" in only and "LICENSE" in only and "CERT-1.0-REPORT.md" not in only
-    assert not [path for path in only if path.startswith(".") or "IMPROVEMENTS" in path]
+    assert only == [
+        "src", "tests", "scripts", "README.md", "GUIDE.md", "CHANGELOG.md",
+        "CONTRIBUTING.md", "LICENSE", "pyproject.toml", "requirements-dev.txt",
+    ]  # fmt: skip
 
 
 def test_the_gate_stops_on_every_failing_step() -> None:
@@ -87,3 +92,14 @@ def test_every_view_pickles_at_every_protocol(protocol: int) -> None:
         for view in (md.keys(), md.items(), md.values(), md.allitems(), md.allvalues()):
             again = pickle.loads(pickle.dumps(view, protocol))
             assert type(again) is type(view) and list(again) == list(view)
+
+
+@pytest.mark.parametrize("protocol", range(pickle.HIGHEST_PROTOCOL + 1))
+def test_a_pickled_view_stays_bound_to_its_pickled_multi_dict(protocol: int) -> None:
+    names = ["keys", "items", "values", "allitems", "allvalues"]
+    md = MultiDict([("a", 1)])
+    again, *loaded = pickle.loads(pickle.dumps([md, *(getattr(md, n)() for n in names)], protocol))
+    again.add("b", 2)
+    for name, view in zip(names, loaded, strict=True):
+        assert list(view) == list(getattr(again, name)()), name
+        assert len(view) == len(getattr(again, name)()), name
