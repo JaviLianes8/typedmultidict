@@ -9,7 +9,7 @@ Progress:
 - [x] Contract, fuzz and author mutation round (items 6, 9, 18)
 - [x] Docs: README, GUIDE, CHANGELOG (items 11, 12)
 - [x] Packaging, e2e and upgrade from PyPI 0.2.0 (items 8, 13, 14)
-- [ ] Every interpreter on this PC (item 10)
+- [x] Every interpreter on this PC (item 10)
 - [ ] Five QA lenses report PASS (item 19)
 - [ ] Independent reviewer (item 16)
 - [ ] Gates (item 15)
