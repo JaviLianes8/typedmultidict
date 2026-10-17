@@ -154,10 +154,16 @@ def references() -> dict[str, tuple[bool, list[str], Any, dict[str, Any]]]:
         refs["requests"] = (True, case, CaseInsensitiveDict, _requests_ops())
     except ImportError:
         pass
-    refs["email-message"] = (True, case, lambda pairs: _filled_message(email.message, pairs),
-                             _email_ops())  # fmt: skip
-    refs["wsgiref-headers"] = (True, case, lambda pairs: wsgiref.headers.Headers(list(pairs)),
-                               _wsgiref_ops())  # fmt: skip
+
+    # email and wsgiref check names against RFC 5322 on newer Pythons: ASCII names only.
+    def message(pairs: list[tuple[str, str]]) -> Any:
+        return _filled_message(email.message, pairs)
+
+    def wsgi(pairs: list[tuple[str, str]]) -> Any:
+        return wsgiref.headers.Headers(list(pairs))
+
+    refs["email-message"] = (True, CASE_KEYS, message, _email_ops())
+    refs["wsgiref-headers"] = (True, CASE_KEYS, wsgi, _wsgiref_ops())
     return refs
 
 
