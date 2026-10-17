@@ -1,6 +1,7 @@
-"""Build the wheel, install it in a throwaway venv and drive the installed package.
+"""Build the wheel and sdist, install them in throwaway venvs and use them from outside.
 
-Slow and needs the build backend, so it runs only with TYPEDMULTIDICT_E2E=1.
+Slow and needs the build backend and network (the upgrade starts from PyPI 0.2.0), so it
+runs only with TYPEDMULTIDICT_E2E=1.
 """
 
 from __future__ import annotations
@@ -8,6 +9,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import tarfile
 import venv
 import zipfile
 from pathlib import Path
@@ -15,79 +17,118 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
+E2E = Path(__file__).with_name("e2e_programs")
 
 pytestmark = pytest.mark.skipif(
     os.environ.get("TYPEDMULTIDICT_E2E") != "1",
-    reason="set TYPEDMULTIDICT_E2E=1 to build and install",
+    reason="set TYPEDMULTIDICT_E2E=1 to build, install and upgrade",
 )
-
-PROGRAM = r"""
-import copy, importlib.metadata, importlib.resources, pickle, sys
-import typedmultidict
-from typedmultidict import CIMultiDict, MultiDict
-
-assert "site-packages" in typedmultidict.__file__, typedmultidict.__file__
-assert importlib.metadata.version("typedmultidict") == typedmultidict.__version__
-assert importlib.resources.files("typedmultidict").joinpath("py.typed").is_file()
-assert importlib.metadata.requires("typedmultidict") is None or all(
-    "extra ==" in r for r in importlib.metadata.requires("typedmultidict")
-)
-
-md = MultiDict([("a", 1), ("b", 2), ("a", 3)])
-md.update([("a", 7), ("c", 5), ("a", 8)])
-assert list(md.allitems()) == [("a", 7), ("b", 2), ("a", 8), ("c", 5)]
-assert md.popone("a") == 7 and md.popall("a") == [8] and md.popitem() == ("c", 5)
-md.extend(md)
-assert md.to_dict() == {"b": [2, 2]}
-try:
-    md.extend([("x", 1), (2,)])
-except ValueError:
-    pass
-else:
-    raise AssertionError("bad pair accepted")
-assert len(md.allitems()) == 2
-
-headers = CIMultiDict([("Set-Cookie", "a"), ("set-cookie", "b")])
-assert headers.getall("SET-COOKIE") == ["a", "b"] and 5 not in headers
-try:
-    for key in headers:
-        headers.add("X", "1")
-except RuntimeError:
-    pass
-else:
-    raise AssertionError("mutation during iteration not detected")
-twin = pickle.loads(pickle.dumps(headers))
-assert type(twin) is CIMultiDict and twin == headers and copy.deepcopy(twin) == twin
-assert not any(name in sys.modules for name in ("multidict", "werkzeug", "hypothesis"))
-print("e2e ok")
-"""
 
 
 def _run(*cmd: str | Path, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+    # The Windows venv launcher variable would make a child report the wrong interpreter.
+    env = {k: v for k, v in os.environ.items() if k != "__PYVENV_LAUNCHER__"}
     return subprocess.run(
-        [str(c) for c in cmd], cwd=cwd, capture_output=True, text=True, check=False
+        [str(c) for c in cmd],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=600,
+        env=env,
     )
 
 
-def test_installed_wheel_end_to_end(tmp_path: Path) -> None:
-    dist = tmp_path / "dist"
-    built = _run(sys.executable, "-m", "build", "--wheel", "--outdir", dist, ROOT)
+def _venv(path: Path) -> Path:
+    venv.create(path, with_pip=True)
+    return path / ("Scripts" if sys.platform == "win32" else "bin") / "python"
+
+
+def _program(python: Path, name: str, work: Path, *args: str) -> str:
+    # Run from an empty folder so the source tree cannot shadow the install.
+    result = _run(python, "-I", E2E / name, *args, cwd=work)
+    assert result.returncode == 0, result.stdout + result.stderr
+    return result.stdout.strip()
+
+
+@pytest.fixture(scope="module")
+def dist(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    out = tmp_path_factory.mktemp("dist")
+    if not (ROOT / "src" / "typedmultidict" / "__init__.py").exists():
+        pytest.fail("no source tree to build from")
+    built = _run(sys.executable, "-m", "build", "--outdir", out, ROOT)
     assert built.returncode == 0, built.stderr
+    return out
+
+
+def test_archives_hold_exactly_what_should_ship(dist: Path) -> None:
     (wheel,) = dist.glob("typedmultidict-*.whl")
     names = zipfile.ZipFile(wheel).namelist()
     assert "typedmultidict/py.typed" in names
-    assert not [n for n in names if n.startswith("tests/") or "IMPROVEMENTS" in n]
+    assert any(n.endswith("licenses/LICENSE") for n in names)
+    assert all(n.startswith(("typedmultidict/", "typedmultidict-")) for n in names), names
+    (sdist,) = dist.glob("typedmultidict-*.tar.gz")
+    with tarfile.open(sdist) as archive:
+        members = [m.split("/", 1)[1] for m in archive.getnames() if "/" in m]
+    assert "LICENSE" in members and "src/typedmultidict/py.typed" in members
+    assert "tests/sources/MANIFEST.json" in members
+    unwanted = ("IMPROVEMENTS", "CERT-1.0", ".pyc", "tests/sources/rfc", ".hypothesis")
+    assert not [m for m in members if any(u in m for u in unwanted)]
 
-    env_dir = tmp_path / "venv"
-    venv.create(env_dir, with_pip=True)
-    bindir = env_dir / ("Scripts" if sys.platform == "win32" else "bin")
-    python = bindir / "python"
+
+def test_installed_wheel_end_to_end(dist: Path, tmp_path: Path) -> None:
+    (wheel,) = dist.glob("typedmultidict-*.whl")
+    python = _venv(tmp_path / "venv")
     installed = _run(python, "-m", "pip", "install", "-q", wheel)
     assert installed.returncode == 0, installed.stderr
-
-    # Run from an empty folder so the source tree cannot shadow the install.
     work = tmp_path / "work"
     work.mkdir()
-    result = _run(python, "-I", "-c", PROGRAM, cwd=work)
-    assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == "e2e ok"
+    assert _program(python, "consumer.py", work) == "e2e ok"
+
+
+def test_sdist_installs_and_works(dist: Path, tmp_path: Path) -> None:
+    (sdist,) = dist.glob("typedmultidict-*.tar.gz")
+    python = _venv(tmp_path / "venv")
+    installed = _run(python, "-m", "pip", "install", "-q", sdist)
+    assert installed.returncode == 0, installed.stderr
+    work = tmp_path / "work"
+    work.mkdir()
+    assert _program(python, "consumer.py", work) == "e2e ok"
+
+
+def test_upgrade_from_the_pypi_release_keeps_working(dist: Path, tmp_path: Path) -> None:
+    (wheel,) = dist.glob("typedmultidict-*.whl")
+    python = _venv(tmp_path / "venv")
+    old = _run(python, "-m", "pip", "install", "-q", "--no-cache-dir", "typedmultidict==0.2.0")
+    assert old.returncode == 0, old.stderr
+    work = tmp_path / "work"
+    work.mkdir()
+    stored = work / "old.pickle"
+    assert _program(python, "upgrade.py", work, "0.2.0", str(stored)) == "0.2.0 ok"
+    new = _run(python, "-m", "pip", "install", "-q", "--upgrade", wheel)
+    assert new.returncode == 0, new.stderr
+    assert _program(python, "upgrade.py", work, "1.0.0", str(stored)) == "1.0.0 ok"
+
+
+def test_a_strict_typed_consumer_checks_against_the_installed_wheel(
+    dist: Path, tmp_path: Path
+) -> None:
+    pytest.importorskip("mypy")
+    (wheel,) = dist.glob("typedmultidict-*.whl")
+    python = _venv(tmp_path / "venv")
+    installed = _run(python, "-m", "pip", "install", "-q", wheel)
+    assert installed.returncode == 0, installed.stderr
+    work = tmp_path / "work"
+    work.mkdir()
+    checked = _run(
+        sys.executable,
+        "-m",
+        "mypy",
+        "--strict",
+        "--no-incremental",
+        f"--python-executable={python}",
+        E2E / "typed_consumer.py",
+        cwd=work,
+    )
+    assert checked.returncode == 0, checked.stdout + checked.stderr
+    assert _program(python, "typed_consumer.py", work) == "typed ok"
