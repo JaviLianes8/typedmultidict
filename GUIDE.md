@@ -107,7 +107,8 @@ counts, even replacing a value in place, which `dict` allows.
 | bulk element that is not iterable | `TypeError` naming its position and type |
 | bulk element whose length is not 2 | `ValueError` naming its position and length |
 | non-`str` key added to a `CIMultiDict` | `TypeError` naming the type |
-| change during iteration | `RuntimeError` |
+| change during iteration (also between `iter()` and the first item) | `RuntimeError` |
+| a key's `__eq__` or `__hash__` writes to the same multi-dict during a write | `RuntimeError`, nothing changed |
 
 `KeyError` carries the key you passed, like `dict`. Every other message names a position,
 a length or a type (at most 40 characters of its name) and never includes a value.
@@ -121,7 +122,11 @@ linear in their input. Removed pairs leave holes that are swept out once they ou
 the live pairs, so deleting every key one by one is linear overall.
 
 A multi-dict is not safe to change from several threads at once without a lock, like
-`dict` and every reference listed below.
+`dict` and every reference listed below. Key comparisons run your code in the middle of
+a write; reading the multi-dict from there is fine, writing to it raises `RuntimeError`.
+Keys must keep the hash contract: a key whose hash or equality changes between calls
+(or raises only sometimes) can leave a failed bulk write half undone, as it can corrupt
+a `dict`.
 
 ## Compared with the references
 

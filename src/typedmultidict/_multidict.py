@@ -6,6 +6,7 @@ import copy as _copy
 from collections.abc import Hashable, Iterator
 from typing import TYPE_CHECKING, Any, TypeVar, overload
 
+from ._guard import exclusive
 from ._pairs import MultiDictInput, read_pairs
 from ._storage import _Entry, _Storage
 from ._values import _MultiValues
@@ -48,6 +49,7 @@ class MultiDict(_MultiValues[K, V]):
         pairs.extend(extra.items())
         return [(self._token(key), key, value) for key, value in pairs]
 
+    @exclusive
     def add(self, key: K, value: V) -> None:
         """Append another value for ``key`` without replacing existing ones.
 
@@ -59,6 +61,7 @@ class MultiDict(_MultiValues[K, V]):
         """
         self._append([(self._token(key), key, value)])
 
+    @exclusive
     def extend(self, other: MultiDictInput[K, V]) -> None:
         """Append every pair of a mapping, multi-dict or iterable of pairs.
 
@@ -70,6 +73,7 @@ class MultiDict(_MultiValues[K, V]):
         """
         self._append(self._collect(other, {}))
 
+    @exclusive
     def merge(self, other: MultiDictInput[K, V]) -> None:
         """Append the pairs whose key is not present yet; keys already here are skipped.
 
@@ -95,6 +99,7 @@ class MultiDict(_MultiValues[K, V]):
     @overload
     def update(self: MultiDict[str, V], /, **kwargs: V) -> None: ...
 
+    @exclusive
     def update(self, other: Any = (), /, **kwargs: Any) -> None:
         """Replace the values of every incoming key, reusing the old positions in order.
 

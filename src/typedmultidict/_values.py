@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Hashable
 from typing import Any, TypeVar, overload
 
+from ._guard import exclusive
 from ._mapping import _MISSING, _Mapping
 from ._views import AllItemsView, AllValuesView
 
@@ -58,6 +59,7 @@ class _MultiValues(_Mapping[K, V]):
     @overload
     def popone(self, key: K, default: T) -> V | T: ...
 
+    @exclusive
     def popone(self, key: K, default: Any = _MISSING) -> Any:
         """Remove and return the first value of ``key``; later values stay.
 
@@ -72,10 +74,10 @@ class _MultiValues(_Mapping[K, V]):
             if default is _MISSING:
                 raise KeyError(key)
             return default
+        if len(bucket) == 1:
+            del self._index[token]  # compares keys: done before anything else changes
         first = bucket.popleft()
         self._hole(first)
-        if not bucket:
-            del self._index[token]
         self._changed()
         return first.value
 
@@ -84,6 +86,7 @@ class _MultiValues(_Mapping[K, V]):
     @overload
     def popall(self, key: K, default: T) -> list[V] | T: ...
 
+    @exclusive
     def popall(self, key: K, default: Any = _MISSING) -> Any:
         """Remove and return every value of ``key`` as a list, else ``default`` or ``KeyError``.
 
@@ -103,6 +106,7 @@ class _MultiValues(_Mapping[K, V]):
         self._changed()
         return values
 
+    @exclusive
     def popitem(self) -> tuple[K, V]:
         """Remove and return the last pair added; other values of its key stay.
 
@@ -113,14 +117,15 @@ class _MultiValues(_Mapping[K, V]):
         """
         if not self._index:
             raise KeyError("popitem(): multi-dict is empty")
-        last = self._entries.pop()
-        while last is None:  # holes at the end go with it
+        while (last := self._entries[-1]) is None:  # holes at the end go first
+            self._entries.pop()
             self._holes -= 1
-            last = self._entries.pop()
+        # Key comparisons happen here, before the pair itself is touched.
         bucket = self._index[last.token]
-        bucket.pop()
-        if not bucket:
+        if len(bucket) == 1:
             del self._index[last.token]
+        self._entries.pop()
+        bucket.pop()
         self._changed()
         return last.key, last.value
 

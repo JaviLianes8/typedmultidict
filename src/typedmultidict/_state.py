@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from ._storage import _Storage
 
 # Rebuilt from the pairs, never copied as they are.
-_OWN = frozenset({"_entries", "_holes", "_index", "_version"})
+_OWN = frozenset({"_busy", "_entries", "_holes", "_index", "_version"})
 
 
 def state_of(obj: _Storage[Any, Any]) -> tuple[Any, ...]:

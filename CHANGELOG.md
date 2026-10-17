@@ -31,6 +31,12 @@ behaviour described in the README and the guide. Later 1.x releases only add.
   of a tuple or list and says "3 or more" for other iterables.
 - Error messages show at most 40 characters of a type name, and never the offending value.
 - The version has a single source (`typedmultidict.__version__`).
+- A key whose `__eq__` or `__hash__` writes to the same multi-dict in the middle of a write
+  now gets `RuntimeError` and the multi-dict is left unchanged; before, the internal index
+  could silently go out of step.
+- `keys()`, `items()` and `values()` iterators raise `RuntimeError` for a change made
+  between `iter()` and the first item, as `iter(md)` and `dict` views do.
+- `repr` of a view held inside its own multi-dict prints `...` instead of recursing.
 - `get`, `pop`, `setdefault`, `keys`, `items`, `values` and `clear` are now written out on
   the class with their own docstrings. They behave as the `collections.abc` mixins did,
   and `get`, `pop` and `setdefault` still go through `__getitem__`, `__setitem__` and

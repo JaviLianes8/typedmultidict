@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import reprlib
 from collections.abc import Collection, Hashable, Iterator
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
@@ -44,6 +45,7 @@ class AllItemsView(Collection[tuple[K, V]], Generic[K, V]):
         entries = self._mapping._index.get(self._mapping._probe(key), ())
         return any(entry.value is value or entry.value == value for entry in entries)
 
+    @reprlib.recursive_repr()
     def __repr__(self) -> str:
         return f"{type(self).__name__}({list(self)!r})"
 
@@ -76,5 +78,6 @@ class AllValuesView(Collection[V], Generic[V]):
     def __contains__(self, value: object) -> bool:
         return any(entry.value is value or entry.value == value for entry in self._mapping._live())
 
+    @reprlib.recursive_repr()
     def __repr__(self) -> str:
         return f"{type(self).__name__}({list(self)!r})"

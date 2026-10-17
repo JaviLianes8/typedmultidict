@@ -8,6 +8,7 @@ from collections import deque
 from collections.abc import Hashable, Iterator, Mapping, MutableMapping
 from typing import Any, ClassVar, TypeVar
 
+from ._guard import exclusive
 from ._state import restore, state_of
 
 K = TypeVar("K", bound=Hashable)
@@ -38,6 +39,7 @@ class _Storage(MutableMapping[K, V]):
     # references, and still do.
 
     _folds_case: ClassVar[bool] = False
+    _busy = False  # set while a write runs; see _guard
 
     def _setup(self) -> None:
         self._entries: list[_Entry | None] = []
@@ -61,21 +63,22 @@ class _Storage(MutableMapping[K, V]):
         return len(self._entries) - self._holes
 
     def _append(self, pairs: list[tuple[Hashable, K, V]]) -> None:
-        added: list[_Entry] = []
+        added: list[tuple[_Entry, deque[_Entry]]] = []
         start = len(self._entries)
         try:
             for token, key, value in pairs:
                 entry = _Entry(token, key, value, start + len(added))
                 # A key whose __hash__ or __eq__ raises fails here; undo what came before.
-                self._index.setdefault(token, deque()).append(entry)
-                added.append(entry)
+                bucket = self._index.setdefault(token, deque())
+                bucket.append(entry)
+                added.append((entry, bucket))
         except BaseException:
-            for entry in reversed(added):
-                self._index[entry.token].pop()
-                if not self._index[entry.token]:
+            for entry, bucket in reversed(added):
+                bucket.pop()
+                if not bucket:
                     del self._index[entry.token]
             raise
-        self._entries.extend(added)
+        self._entries.extend(entry for entry, _ in added)
         self._version += 1
 
     def _hole(self, entry: _Entry) -> None:
@@ -93,10 +96,10 @@ class _Storage(MutableMapping[K, V]):
 
     def _trim(self, token: Hashable, bucket: deque[_Entry], keep: int) -> None:
         """Remove the entries of one key beyond its first ``keep``."""
+        if not keep:
+            del self._index[token]  # compares keys: done before anything else changes
         while len(bucket) > keep:
             self._hole(bucket.pop())
-        if not bucket:
-            del self._index[token]
 
     def _iterate(self, version: int) -> Iterator[_Entry]:
         # Checked before each step, so a change made between iter() and next() is caught.
@@ -115,6 +118,7 @@ class _Storage(MutableMapping[K, V]):
         value: V = bucket[0].value
         return value
 
+    @exclusive
     def __setitem__(self, key: K, value: V) -> None:
         token = self._token(key)
         bucket = self._index.get(token)
@@ -127,6 +131,7 @@ class _Storage(MutableMapping[K, V]):
         self._trim(token, bucket, 1)
         self._changed()
 
+    @exclusive
     def __delitem__(self, key: K) -> None:
         token = self._probe(key)
         bucket = self._index.get(token)

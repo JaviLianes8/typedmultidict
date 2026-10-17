@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Hashable, ItemsView, KeysView, ValuesView
 from typing import Any, TypeVar, overload
 
+from ._guard import exclusive
+from ._mapviews import _Items, _Keys, _Values
 from ._storage import _Storage
 
 K = TypeVar("K", bound=Hashable)
@@ -55,7 +57,7 @@ class _Mapping(_Storage[K, V]):
         >>> list(md.keys()), md.keys() == {"a", "b"}
         (['a', 'b'], True)
         """
-        return KeysView(self)
+        return _Keys(self)
 
     def items(self) -> ItemsView[K, V]:
         """A live view of ``(key, first value)`` for each key; ``allitems()`` sees every pair.
@@ -65,7 +67,7 @@ class _Mapping(_Storage[K, V]):
         >>> list(md.items()), ("a", 3) in md.items()
         ([('a', 1), ('b', 2)], False)
         """
-        return ItemsView(self)
+        return _Items(self)
 
     def values(self) -> ValuesView[V]:
         """A live view of the first value of each key; ``allvalues()`` sees every value.
@@ -74,7 +76,7 @@ class _Mapping(_Storage[K, V]):
         >>> list(MultiDict([("a", 1), ("b", 2), ("a", 3)]).values())
         [1, 2]
         """
-        return ValuesView(self)
+        return _Values(self)
 
     @overload
     def pop(self, key: K) -> V: ...
@@ -119,6 +121,7 @@ class _Mapping(_Storage[K, V]):
             self[key] = default
         return default
 
+    @exclusive
     def clear(self) -> None:
         """Remove every pair.
 
