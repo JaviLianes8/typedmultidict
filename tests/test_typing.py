@@ -38,7 +38,51 @@ MultiDict[list[int], int]()
 MultiDict[int, int]().update(x=1)
 md.extend([("a", "b")])
 ci.update(b=1)
+reveal_type(md["a"])
+reveal_type(md.get("a", 0))
+reveal_type(md.get("a", "x"))
+reveal_type(md.pop("a"))
+reveal_type(md.pop("a", None))
+reveal_type(md.setdefault("a", 1))
+reveal_type(md.getall("a", None))
+reveal_type(md.popone("a"))
+reveal_type(md.popall("a"))
+reveal_type(md.keys())
+reveal_type(md.items())
+reveal_type(md.values())
+reveal_type(md.allitems())
+reveal_type(md.allvalues())
+reveal_type(next(iter(md)))
+reveal_type(md.popitem())
+reveal_type(ci.get("a", b""))
+reveal_type(ci.setdefault("a", b""))
+reveal_type(ci["a"])
+reveal_type(md.pop("a", 0))
 """
+
+# Lines 27 onwards: what every other public method returns, with and without a default.
+MORE_REVEALED = {
+    27: "int",
+    28: "int",
+    29: "int | str",
+    30: "int",
+    31: "int | None",
+    32: "int",
+    33: "list[int] | None",
+    34: "int",
+    35: "list[int]",
+    36: "typing.KeysView[str]",
+    37: "typing.ItemsView[str, int]",
+    38: "typing.ValuesView[int]",
+    39: "typedmultidict._views.AllItemsView[str, int]",
+    40: "typedmultidict._views.AllValuesView[int]",
+    41: "str",
+    42: "tuple[str, int]",
+    43: "bytes",
+    44: "bytes",
+    45: "bytes",
+    46: "int",
+}
 
 
 @pytest.fixture(scope="module")
@@ -92,6 +136,11 @@ def test_wrong_types_are_rejected(mypy_output: str) -> None:
 
 def test_unhashable_key_types_are_rejected_by_the_bound(mypy_output: str) -> None:
     assert re.search(r"snippet\.py:23: error: .*\[type-var\]", mypy_output), mypy_output
+
+
+def test_every_other_public_method_carries_its_types(mypy_output: str) -> None:
+    for line, expected in MORE_REVEALED.items():
+        assert _revealed(mypy_output, line) == expected, line
 
 
 def test_no_other_line_has_an_error(mypy_output: str) -> None:

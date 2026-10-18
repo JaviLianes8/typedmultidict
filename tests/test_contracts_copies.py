@@ -44,8 +44,8 @@ class _Guarded(MultiDict[str, int]):
     __slots__ = ("tag",)
 
     def __setattr__(self, name: str, value: Any) -> None:
-        if name == "tag":
-            raise AttributeError("tag is read-only")
+        if name in ("tag", "note"):
+            raise AttributeError(f"{name} is read-only")
         super().__setattr__(name, value)
 
 
@@ -104,12 +104,13 @@ def test_an_unset_slot_stays_unset(clone: Clone) -> None:
 
 
 @pytest.mark.parametrize("clone", CLONES)
-def test_slots_come_back_without_the_subclass_setattr(clone: Clone) -> None:
-    # Like the instance dictionary, slots are restored directly, never through a hook.
+def test_slots_and_attributes_come_back_without_the_subclass_setattr(clone: Clone) -> None:
+    # As in pickle's own default, saved state is put back directly, never through a hook.
     md = _Guarded([("a", 1)])
     object.__setattr__(md, "tag", "t")
+    vars(md)["note"] = "n"
     twin = clone(md)
-    assert twin.tag == "t" and list(twin.allitems()) == [("a", 1)]
+    assert twin.tag == "t" and twin.note == "n" and list(twin.allitems()) == [("a", 1)]
 
 
 @pytest.mark.parametrize("clone", CLONES)

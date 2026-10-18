@@ -34,8 +34,13 @@ def read_pairs(source: Any, storage_type: type[_Storage[Any, Any]]) -> list[tupl
     """Return every pair of ``source`` as a new list, validating each element first."""
     if isinstance(source, storage_type):
         return [(entry.key, entry.value) for entry in source._live()]
-    if hasattr(source, "keys"):
-        # The same test dict.update uses: anything with keys() is read as a mapping.
+    items = getattr(source, "items", None)
+    if callable(items):
+        # Header objects (http.client, email, wsgiref, other multi-dicts) list every field
+        # here, while keys() and [] would repeat the first value of a repeated name.
+        source = items()
+    elif hasattr(source, "keys"):
+        # The same test dict.update uses: anything else with keys() is read as a mapping.
         return [(key, source[key]) for key in source.keys()]  # noqa: SIM118
     pairs: list[tuple[Any, Any]] = []
     for position, item in enumerate(source):

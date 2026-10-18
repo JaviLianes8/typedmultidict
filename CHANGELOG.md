@@ -29,6 +29,12 @@ behaviour described in the README and the guide. Later 1.x releases only add.
 - Bulk input reads at most three items of each element, so an endless or huge element
   fails at once with `ValueError` instead of hanging. The message gives the exact length
   of a tuple or list and says "3 or more" for other iterables.
+- A source with an `items()` method is read through `items()`, as the `multidict` C
+  extension reads it, so building from an `http.client.HTTPMessage`, an
+  `email.message.Message`, a `wsgiref.headers.Headers` or another library's multi-dict
+  keeps every field. 0.2.0 read such objects through `keys()` and `[]`, which repeated
+  the first value of a repeated name. An object with only `keys()` and `[]` is still read
+  like `dict.update` reads it.
 - Error messages show at most 40 characters of a type name, and never the offending value.
 - The version has a single source (`typedmultidict.__version__`).
 - A key whose `__eq__` or `__hash__` writes to the same multi-dict in the middle of a write

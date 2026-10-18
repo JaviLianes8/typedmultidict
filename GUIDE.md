@@ -44,19 +44,30 @@ print(list(md.items()), md.getall("a"))  # [('a', 1), ('b', 2)] [1, 3]
 | `md.popitem()` | removes and returns the last pair added; other pairs of its key stay |
 | `md.clear()` | removes everything |
 
-`other` may be a mapping (anything with `keys()`, read like `dict.update` reads it), a
-multi-dict (every pair is copied, not only first values) or an iterable of pairs. Bulk
-input is read and checked in full before anything changes: an element that is not
-iterable raises `TypeError`, one whose length is not 2 raises `ValueError`, both naming
-its position; at most three items of each element are read, so an endless element fails
-at once. `md.extend(md)` doubles the pairs and returns.
+`other` may be a multi-dict (every pair is copied, not only first values), anything with
+an `items()` method (read through `items()`: a `dict`, or a header object such as an
+`http.client.HTTPMessage`, an `email.message.Message`, a `wsgiref.headers.Headers` or a
+`multidict.CIMultiDict`, each of which lists every field there), anything else with
+`keys()` (read like `dict.update` reads it) or an iterable of pairs. Werkzeug's
+`MultiDict` lists only first values in `items()`: pass `items(multi=True)` to copy every
+pair. Bulk input is read and checked in full before anything changes: an element that
+is not iterable raises `TypeError`, one whose length is not 2 raises `ValueError`, both
+naming its position; at most three items of each element are read, so an endless element
+fails at once. `md.extend(md)` doubles the pairs and returns.
 
 ```python
-from typedmultidict import MultiDict
+import http.client
+import io
+
+from typedmultidict import CIMultiDict, MultiDict
 
 md = MultiDict([("a", 1), ("b", 2), ("a", 3)])
 md.update([("a", 7), ("a", 8), ("a", 9)], b=0)
 print(md)  # MultiDict([('a', 7), ('b', 0), ('a', 8), ('a', 9)])
+
+raw = b"Set-Cookie: a=1\r\nX-Id: 7\r\nset-cookie: b=2\r\n\r\n"
+headers = CIMultiDict(http.client.parse_headers(io.BytesIO(raw)))
+print(headers.getall("SET-COOKIE"), headers["x-id"])  # ['a=1', 'b=2'] 7
 ```
 
 ## Case-insensitive keys
@@ -168,6 +179,8 @@ The deliberate differences, each shown live by `tests/test_reference_differences
 | `email.message` | `get_all(missing)` is `None` | `getall(missing)` is `[]` |
 | multidict | a plain and a case-insensitive multi-dict differing only in key case are unequal | equal after folding string keys |
 | Werkzeug `Headers` | deleting a missing name is silent | `del` raises `KeyError` |
+| multidict (C extension) | bulk input other than a multi-dict is read through `items()` or by iterating it, never through `keys()` | an object with only `keys()` and `[]` is read like `dict.update` reads it |
+| multidict (pure-Python fallback) | anything with `keys()` is read through `keys()` and `[]`, so a header object repeats the first value of a repeated name | read through `items()` first: every field is kept |
 
 The cited documentation (RFC 9110, the `collections.abc`, `email` and `wsgiref` pages,
 the multidict and Werkzeug docs, requests' `structures.py` at 2.34.2) is fetched by

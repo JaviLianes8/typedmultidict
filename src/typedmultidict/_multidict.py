@@ -27,7 +27,8 @@ class MultiDict(_MultiValues[K, V]):
     Mapping operations act on the first value of each key, so the type behaves like a
     normal mapping (``len()`` counts keys). The multi-value surface (``add``, ``getall``,
     ``allitems`` and friends) sees every stored pair in insertion order. ``initial`` is a
-    mapping, a multi-dict (every pair is copied) or an iterable of ``(key, value)`` pairs.
+    multi-dict (every pair is copied), a mapping or header object (read through ``items()``,
+    else ``keys()``) or an iterable of ``(key, value)`` pairs.
 
     >>> from typedmultidict import MultiDict
     >>> md = MultiDict([("tag", "a"), ("page", "2"), ("tag", "b")])

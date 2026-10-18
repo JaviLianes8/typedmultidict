@@ -127,7 +127,7 @@ print(headers.copy() == headers, headers.copy() is headers)  # True False
 
 | Name | What it does |
 | --- | --- |
-| `MultiDict[K, V](initial=None)` | Ordered multi-value mapping. `initial` is a mapping, a multi-dict (every pair is copied) or an iterable of pairs. `K` must be hashable. |
+| `MultiDict[K, V](initial=None)` | Ordered multi-value mapping. `initial` is a multi-dict (every pair is copied), a mapping or header object (read through `items()`, else `keys()`) or an iterable of pairs. `K` must be hashable. |
 | `CIMultiDict[V](initial=None)` | `MultiDict[str, V]` whose keys compare with `str.lower`. A non-`str` key raises `TypeError` when added and is absent when looked up. |
 | `md[key]`, `get`, `in`, `keys`, `items`, `values`, `len()`, iteration | The `Mapping` view: first value of each key, keys once each. |
 | `md[key] = value` | Replaces every value of `key` with one, in the place of the first. |
@@ -148,9 +148,10 @@ print(headers.copy() == headers, headers.copy() is headers)  # True False
 
 Bulk input (`initial`, `extend`, `merge`, `update`) is read and checked in full first: an
 element that is not a pair raises `TypeError`, one of the wrong length raises
-`ValueError`, both with its position, and the mapping is left unchanged. Lookups cost
-the same whatever the size, and so do `add`, `popone` and `popitem` on average; other
-removals cost time in proportion to the pairs they remove.
+`ValueError`, both with its position, and the mapping is left unchanged. A source with
+`items()` is read through it, so an `http.client` or `email` message keeps every field of
+a repeated name. Lookups cost the same whatever the size, and so do `add`, `popone` and
+`popitem` on average; other removals cost time in proportion to the pairs they remove.
 
 ### Compared with `multidict` and Werkzeug
 
