@@ -38,13 +38,16 @@ below `requires-python`.
 
 ## API review (items 1 to 5)
 
-Kept from 0.2.0 with the same names, signatures and defaults: `MultiDict(initial=None)`,
-`CIMultiDict`, `add`, `extend`, `merge`, `update(other=(), /, **kwargs)`, `getone`,
+Kept from 0.2.0 with the same names, signatures and defaults: `CIMultiDict`, `add`,
+`update(other=(), /, **kwargs)`, `getone`,
 `getall`, `popone`, `popall`, `popitem`, `allitems`, `allvalues`, `to_dict`, `copy` and
 the `MutableMapping` methods (`get`, `pop`, `setdefault`, `keys`, `items`, `values`,
 `clear`, keyword-capable as before). `tests/test_contract.py` freezes every public
 signature, `__all__`, the public module path of each class and the absence of any other
-public name; the "no default" marker shows as `<missing>` in `help()`.
+public name; the "no default" marker shows as `<missing>` in `help()`. Changed after QA
+round 1 (lens a A2, lens b F3): the constructor is `MultiDict(initial=None, /, **kwargs)`
+and `extend` and `merge` are `(other=(), /, **kwargs)`, matching `update`, `dict()` and
+`multidict`, so the source can no longer be passed by name.
 
 Defects of 0.2.0 found by the review, each checked against the real 0.2.0:
 
@@ -83,6 +86,11 @@ callable `items()` is read through it, so an `http.client.HTTPMessage`, an
 `email.message.Message` or a `wsgiref.headers.Headers` keeps every field of a repeated
 name (0.2.0 read such objects through `keys()` and `[]`, which repeated the first value).
 An object with only `keys()` and `[]` is still read as `dict.update` reads it.
+After QA round 1: the constructor, `extend` and `merge` take keyword pairs and their
+source is positional only (`MultiDict(initial=x)` now stores a pair named `"initial"`, as
+`dict` does); `pop` and `setdefault` refuse a write made by a key comparison during their
+lookup; an object that only claims to be a `str` is absent from a `CIMultiDict`; mapping
+views pickle through `operator.methodcaller` (0.2.0 view pickles still load).
 
 ## Ground truth (item 7)
 
@@ -231,3 +239,30 @@ and sweep at most 40 new mutations on the code changed since.
 | d | 2 | c776947 | FAIL | fixes confirmed, matrix green (496 passed, 3.10 skips the two `tomllib` tests); 11 survivors (script guards checked only as text, detached view pickles, partial sdist list and keywords). Fixed in 825b992 (`tests/test_scripts.py` runs both scripts against a stub interpreter) |
 | d | 3 | 825b992 | PASS | all 11 survivors killed |
 | e. Contract strength | 1 | 95c553a | FAIL | own mutation round without the author's list; 29 survivors (slot shapes through copies, the view pickle form, key errors as given, message edges, writes from comparisons with another multi-dict, lookup errors, mapping equality, foreign input errors, view membership). Contracts added in 1ab302b and 8027556 |
+| a | 4 | 220c40a | FAIL | every README and GUIDE example and 63 doctests run, `__all__` exact, mypy strict clean, 28 pickles from 0.1.0 and 0.2.0 load; A1 mapping views pickled under the private `_mapviews`; A2 constructor signature unlike `update`, `dict` and multidict (`initial` by name, no keywords); A3 `popitem` documented as "last pair added"; A4 the Errors rule on messages overstated. Fixed in 11cb80a |
+| b | 4 | 220c40a | FAIL | F3 constructor, `extend` and `merge` refused multidict's keyword pairs and `extend()` with no argument; F1 GUIDE row on multidict's mixed-kind equality true in one direction only; F2 `email.message` rejects non-ASCII names on 3.14, so the "all agree" sentence was false there. Fixed in 11cb80a |
+| c | 6 | 220c40a | FAIL | fuzz (1 600 seeds, 3 interpreters, injected bugs caught 20 of 20), scaling linear, bounded messages; F1 unlocked writes from several threads raise misleading `RuntimeError` and corrupt the multi-dict, while the docs said "like `dict`"; F2 `pop` and `setdefault` let a key comparison write during their lookup; F3 `Mock(spec=str)` keys made `CIMultiDict` raise inside `str.lower`. Fixed in 11cb80a |
+| e | 2 | 220c40a | FAIL | own mutation round; M59 (`update` overwriting reused pairs before indexing fresh ones) survived: no test made indexing a fresh key fail after a reused one. Fixed in 11cb80a |
+
+### QA round 1 at 220c40a: what changed (11cb80a)
+
+| Finding | Change | Proof |
+| --- | --- | --- |
+| a A1 | `keys()`, `items()`, `values()` views reduce to `operator.methodcaller(name)` called with the multi-dict; the old classes stay so 0.2.0 view pickles load | `tests/test_contracts_copies.py::test_view_pickles_name_only_public_modules` (every protocol), red on 220c40a |
+| a A2, b F3 | `__init__(initial=None, /, **kwargs)`, `extend` and `merge` `(other=(), /, **kwargs)` with typed overloads (string keys for keywords); README, GUIDE, CHANGELOG, signature contract updated | `tests/test_contracts_keywords.py` (8 tests, all red on 220c40a), `tests/test_typing.py` lines 47 to 52 |
+| a A3 | "last pair in order" in the docstring, README (twice), GUIDE and CHANGELOG | doctest unchanged |
+| a A4 | GUIDE Errors paragraph: no message includes a value; bulk-input and key messages name a position, length or type; the rest are fixed sentences | docs |
+| b F1 | GUIDE row: multidict calls them equal only when the plain side is already lower case | `tests/test_reference_differences_more.py::test_multidict_folds_only_the_case_insensitive_side_across_kinds` (C and pure Python, both orders) |
+| b F2 | GUIDE: from 3.14 `email.message` refuses non-ASCII field names | `test_email_folds_non_ascii_names_only_before_python_3_14` (version-aware) |
+| c F1 | option (b): README and GUIDE now say a multi-dict is not thread-safe, unlike `dict`, and must be shared behind a lock covering reads and writes; unlocked concurrent writes can raise `RuntimeError` and corrupt it. A per-instance write lock was not taken because reads racing a write would still be unsafe, so "like `dict`" could not be made true | `tests/test_contracts_threads.py` (4 threads, switch interval 1e-6, behind a lock: exact contents, popitem drains) |
+| c F2 | the lookup of `pop` and `setdefault` runs under the write guard; the item hooks are still called as before | `tests/test_hostile.py` (pop and setdefault added to the reentrancy matrix, red on 220c40a), hook-order test unchanged |
+| c F3 | `CIMultiDict`, mixed equality, type names and `allitems()` membership test the real type (`issubclass(type(x), str)` / `tuple`) | `tests/test_contracts_spoofed.py` (4 tests, red on 220c40a) |
+| e M59 | contract added: `update([("x", 5), (meddler, 2)])` with the refused write at comparison 1 to 3 | `tests/test_hostile.py`, kills M59 at comparison 3 (checked by applying M59 to 11cb80a: 3 failures) |
+
+Gates at 11cb80a on a fresh clone (Elena's PC, turn elena/7, CPython 3.14): `ruff format
+--check .`, `ruff check .`, `mypy --strict src tests scripts` and `pytest` (697 passed,
+13 skipped, all opt-in) each exit 0.
+
+### Disputed findings
+
+None. Every finding of round 1 was reproduced before it was fixed.

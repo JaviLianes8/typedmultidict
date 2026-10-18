@@ -47,8 +47,7 @@ print(list(md.items()), md.getall("a"))  # [('a', 1), ('b', 2)] [1, 3]
 The constructor takes the same arguments as `extend`: `MultiDict([("a", 1)], b=2)`.
 `other` is positional only and optional, so keyword pairs may use any string key, as in
 `dict()`. `other` may be a multi-dict (every pair is copied, not only first values),
-anything with
-an `items()` method (read through `items()`: a `dict`, or a header object such as an
+anything with an `items()` method (read through `items()`: a `dict`, or a header object such as an
 `http.client.HTTPMessage`, an `email.message.Message`, a `wsgiref.headers.Headers` or a
 `multidict.CIMultiDict`, each of which lists every field there), anything else with
 `keys()` (read like `dict.update` reads it) or an iterable of pairs. Werkzeug's
