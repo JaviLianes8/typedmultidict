@@ -13,7 +13,8 @@ Progress:
 - [x] Bulk input read through `items()`, author mutation round 3 (items 1, 7, 18)
 - [ ] Five QA lenses report PASS (item 19)
 - [ ] Independent reviewer (item 16)
-- [ ] Gates (item 15)
+- [x] Gates (item 15): at 926996d on a fresh clone (laptop, CPython 3.14), `ruff format --check .`,
+  `ruff check .`, `mypy --strict src` (and `src tests scripts`) and `pytest` each exit 0
 - [ ] PR open and trace guard CLEAN (item 17); merge and publish left to the maintainer
 
 ## Baseline on 0.2.0 (before any change)
