@@ -49,6 +49,18 @@ class _Guarded(MultiDict[str, int]):
         super().__setattr__(name, value)
 
 
+class _Underscored(MultiDict[str, int]):
+    __slots__ = ("_note",)  # one leading underscore: not name-mangled
+
+
+class _Base(MultiDict[str, int]):
+    __slots__ = ("label",)
+
+
+class _Child(_Base):
+    __slots__ = ("extra",)
+
+
 @pytest.mark.parametrize("clone", CLONES)
 def test_a_case_insensitive_copy_still_folds_case(clone: Clone) -> None:
     twin = clone(CIMultiDict([("X-Tag", 1), ("x-tag", 2), ("Other", 3)]))
@@ -98,6 +110,30 @@ def test_slots_come_back_without_the_subclass_setattr(clone: Clone) -> None:
     object.__setattr__(md, "tag", "t")
     twin = clone(md)
     assert twin.tag == "t" and list(twin.allitems()) == [("a", 1)]
+
+
+@pytest.mark.parametrize("clone", CLONES)
+def test_single_underscore_and_inherited_slots_survive(clone: Clone) -> None:
+    md = _Underscored([("a", 1)])
+    md._note = "n"  # type: ignore[attr-defined]
+    assert clone(md)._note == "n"
+    child = _Child([("a", 1)])
+    child.label, child.extra = "l", "e"  # type: ignore[attr-defined]
+    twin = clone(child)
+    assert (twin.label, twin.extra, list(twin.allitems())) == ("l", "e", [("a", 1)])
+
+
+@pytest.mark.parametrize("clone", CLONES)
+def test_private_instance_attributes_survive(clone: Clone) -> None:
+    md = MultiDict([("a", 1)])
+    md._cache = {"k": 1}  # type: ignore[attr-defined]
+    twin = clone(md)
+    assert twin._cache == {"k": 1} and list(twin.allitems()) == [("a", 1)]
+
+
+def test_a_pickle_from_version_0_1_0_keeps_private_attributes() -> None:
+    md = pickle.loads(pickle.dumps(_Legacy(MultiDict, {"_items": [("a", 1)], "_cache": 5})))
+    assert vars(md)["_cache"] == 5 and list(md.allitems()) == [("a", 1)]
 
 
 @pytest.mark.parametrize("protocol", range(pickle.HIGHEST_PROTOCOL + 1))
