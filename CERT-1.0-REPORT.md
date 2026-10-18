@@ -10,6 +10,7 @@ Progress:
 - [x] Docs: README, GUIDE, CHANGELOG (items 11, 12)
 - [x] Packaging, e2e and upgrade from PyPI 0.2.0 (items 8, 13, 14)
 - [x] Every interpreter on this PC (item 10)
+- [x] Bulk input read through `items()`, author mutation round 3 (items 1, 7, 18)
 - [ ] Five QA lenses report PASS (item 19)
 - [ ] Independent reviewer (item 16)
 - [ ] Gates (item 15)
@@ -24,12 +25,14 @@ exit 0. PyPI has 0.2.0 only. Deleting 20 000 keys one at a time took 10.1 s and
 
 ## Supported Pythons (item 10)
 
-`requires-python = ">=3.10"`. Wheel and sdist built from a fresh clone at 3d67cc4,
+`requires-python = ">=3.10"`. Wheel and sdist built from a fresh clone at 7847bcc,
 `twine check --strict` passed; the sdist's suite run against the installed wheel (`-I`,
 source path removed) with the references, mypy and build installed,
-`TYPEDMULTIDICT_E2E=1`, `TYPEDMULTIDICT_LIVE_ORACLES=1` and the fetched sources present,
-so nothing skips: 392 passed on each of CPython 3.10.19, 3.11.5, 3.12.12, 3.13.2, 3.14.2
-and 3.14.2 free-threaded (each test limited to 180 s). 3.8 and 3.9 are installed but
+`TYPEDMULTIDICT_E2E=1`, `TYPEDMULTIDICT_LIVE_ORACLES=1` and the fetched sources present:
+616 passed on each of CPython 3.11.5, 3.12.12, 3.13.2, 3.14.2 and 3.14.2 free-threaded,
+and 614 passed with 2 skipped on 3.10.19 (the two checks that read `pyproject.toml` need
+`tomllib`, new in 3.11). Each test was limited to 180 s. An earlier run at 3d67cc4 gave
+392 passed on the same six. 3.8 and 3.9 are installed but
 below `requires-python`.
 
 ## API review (items 1 to 5)
@@ -74,7 +77,11 @@ same program on 0.2.0 from PyPI and again after an in-place upgrade to the 1.0.0
 and pickles written by 0.2.0 load in 1.0.0. Differences: `getall` accepts a default; the
 two view classes are public; a bulk element longer than two items that is not a tuple or
 list is reported as "has length 3 or more" (it used to be read in full); type names in
-messages are cut to 40 characters; removals are no longer quadratic.
+messages are cut to 40 characters; removals are no longer quadratic; a bulk source with a
+callable `items()` is read through it, so an `http.client.HTTPMessage`, an
+`email.message.Message` or a `wsgiref.headers.Headers` keeps every field of a repeated
+name (0.2.0 read such objects through `keys()` and `[]`, which repeated the first value).
+An object with only `keys()` and `[]` is still read as `dict.update` reads it.
 
 ## Ground truth (item 7)
 
@@ -110,6 +117,14 @@ and listed in the GUIDE. Every case-insensitive reference folds with `str.lower`
 non-ASCII names included (Kelvin sign, sharp s, dotted capital I, titlecase digraphs),
 and so does `CIMultiDict`. Python 3.14's `email` refuses non-ASCII header names, so the
 email and wsgiref scenarios use ASCII names only.
+
+How bulk input is read was checked live as well (`tests/test_reference_sources.py`,
+`tests/test_contracts_sources.py`): the standard library's own `items()` of an
+`http.client` message, an `email` message and a `wsgiref` header list is the expected
+answer; multidict 7.1.0's C extension reads a header object through `items()` (same
+fields as typedmultidict) and never calls `keys()`, while its pure-Python fallback reads
+`keys()` and `[]` and repeats the first value; Werkzeug's `Headers` lists every field in
+`items()` and its `MultiDict` only first values unless `items(multi=True)`.
 
 ## Fuzz and robustness (item 9)
 
@@ -169,6 +184,29 @@ three batches. 36 mutants: 32 killed at once, 3 survivors closed by contracts ad
 | A35 | `__init__.py` | private module names | `tests/test_contract.py::test_every_exported_name_resolves_and_names_its_public_module` |
 | A36 | `_storage.py` | sweep floor 0 | equivalent control: sweeping earlier changes memory use, never results |
 
+### Round 3: the change to bulk input
+
+Run at 7847bcc on Elena's PC under a turn, same procedure (`pytest -x`, the wheel test
+left out, 300 s limit per test), unchanged control first and last, both green. 14 mutants,
+14 killed.
+
+| Id | File | Mutation | Caught by |
+| --- | --- | --- | --- |
+| M01 | `_pairs.py` | `items()` never used | `tests/test_contracts_sources.py::test_a_header_object_gives_every_field_in_order[_http]` |
+| M02 | `_pairs.py` | a non-callable `items` attribute taken as the reader | `tests/test_contracts_sources.py::test_a_non_callable_items_attribute_falls_back_to_keys` |
+| M03 | `_pairs.py` | what `items()` gives is not validated | `tests/test_contracts_sources.py::test_what_items_gives_is_checked_like_any_bulk_input` |
+| M04 | `_pairs.py` | `items()` read only when `keys()` exists too | `tests/test_contracts_sources.py::test_an_object_with_only_items_is_read_through_it` |
+| M05 | `_pairs.py` | two items read per element instead of three | `tests/test_contracts_edges.py::test_a_list_subclass_is_measured_by_reading_never_by_its_len` |
+| M06 | `_pairs.py` | elements longer than two accepted | `tests/test_contracts_edges.py::test_a_list_subclass_is_measured_by_reading_never_by_its_len` |
+| M07 | `_pairs.py` | "3 or more" reported as "3" | `tests/test_contracts_edges.py::test_a_list_subclass_is_measured_by_reading_never_by_its_len` |
+| M08 | `_pairs.py` | another multi-dict read through `items()` (first values only) | `tests/test_contracts_input.py::test_a_case_insensitive_source_gives_each_pair_in_its_own_spelling` |
+| M09 | `_pairs.py` | type name limit 41 | `tests/test_contracts_edges.py::test_a_longer_type_name_is_cut_to_forty_characters` |
+| M10 | `_pairs.py` | element position off by one | `tests/test_contracts_edges.py::test_a_type_name_of_forty_characters_is_shown_whole` |
+| M11 | `_multidict.py` | keyword pairs before positional ones | `tests/test_contracts_extra.py::test_update_takes_positional_pairs_before_keyword_ones` |
+| M12 | `_pairs.py` | any error while reading an element becomes `TypeError` | `tests/test_contracts_input.py::test_an_element_whose_reading_fails_keeps_its_own_error[element0]` |
+| M13 | `_pairs.py` | `items()` read in reverse | `tests/test_contracts_sources.py::test_a_header_object_gives_every_field_in_order[_http]` |
+| M14 | `_pairs.py` | repeated equal pairs dropped | `tests/test_contracts_extra.py::test_repeated_equal_values_still_differ_from_a_plain_mapping` |
+
 ## QA lenses (item 19)
 
 Five independent reviews, one at a time, each reading the certification rules, running
@@ -191,3 +229,4 @@ and sweep at most 40 new mutations on the code changed since.
 | d. Packaging and real e2e | 1 | 973b649 | FAIL | reproducible builds, `twine check --strict`, wheel and sdist contents and metadata clean, wheel and sdist installed in clean venvs and used from outside, strict typed consumer, 62 pickles written by PyPI 0.2.0 load after the in-place upgrade, every CHANGELOG item checked against the real 0.2.0, suite on 3.10.19 to 3.14.2t (486 passed each); untracked files could reach the sdist (no clean-tree guard); one CHANGELOG line overstated; `allitems()`/`allvalues()` did not pickle at protocols 0 and 1, and mapping views came back broken at those protocols on 3.10 (both already so in 0.2.0); 18 of 33 packaging mutants survived (metadata, scripts). Fixed in 2df6361 and c776947 |
 | d | 2 | c776947 | FAIL | fixes confirmed, matrix green (496 passed, 3.10 skips the two `tomllib` tests); 11 survivors (script guards checked only as text, detached view pickles, partial sdist list and keywords). Fixed in 825b992 (`tests/test_scripts.py` runs both scripts against a stub interpreter) |
 | d | 3 | 825b992 | PASS | all 11 survivors killed |
+| e. Contract strength | 1 | 95c553a | FAIL | own mutation round without the author's list; 29 survivors (slot shapes through copies, the view pickle form, key errors as given, message edges, writes from comparisons with another multi-dict, lookup errors, mapping equality, foreign input errors, view membership). Contracts added in 1ab302b and 8027556 |
