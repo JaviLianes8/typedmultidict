@@ -243,6 +243,10 @@ and sweep at most 40 new mutations on the code changed since.
 | b | 4 | 220c40a | FAIL | F3 constructor, `extend` and `merge` refused multidict's keyword pairs and `extend()` with no argument; F1 GUIDE row on multidict's mixed-kind equality true in one direction only; F2 `email.message` rejects non-ASCII names on 3.14, so the "all agree" sentence was false there. Fixed in 11cb80a |
 | c | 6 | 220c40a | FAIL | fuzz (1 600 seeds, 3 interpreters, injected bugs caught 20 of 20), scaling linear, bounded messages; F1 unlocked writes from several threads raise misleading `RuntimeError` and corrupt the multi-dict, while the docs said "like `dict`"; F2 `pop` and `setdefault` let a key comparison write during their lookup; F3 `Mock(spec=str)` keys made `CIMultiDict` raise inside `str.lower`. Fixed in 11cb80a |
 | e | 2 | 220c40a | FAIL | own mutation round; M59 (`update` overwriting reused pairs before indexing fresh ones) survived: no test made indexing a fresh key fail after a reused one. Fixed in 11cb80a |
+| a | 5 | 975b020 | FAIL | A1 to A4 confirmed fixed, rest of the sweep clean; B1 a keyword pair named `self` raised `TypeError` in the constructor, `extend`, `merge` and `update`, against the GUIDE's "any string key, as in `dict()`". Fixed in 3314dad |
+| b | 5 | 975b020 | FAIL | N1 the same `self` keyword pair (multidict's C extension accepts it); N2 the 3.14 exception named only `email.message`, while `http.client.HTTPMessage` refuses non-ASCII names there too. Fixed in 3314dad |
+| c | 7 | 975b020 | FAIL | N1 the same `self` keyword pair (3.10.19, 3.13.2, 3.14.2t); N2 a subclass `__getitem__` that writes now makes `pop` and `setdefault` raise `RuntimeError`, undocumented. Documented and pinned in 3314dad |
+| e | 3 | 975b020 | FAIL | M59 confirmed killed; F2-N38 (keyword pairs equal to a positional pair dropped) and F3-N19 (`isinstance` back in `type_name`) survived 697 tests. Contracts added in 3314dad |
 
 ### QA round 1 at 220c40a: what changed (11cb80a)
 
@@ -263,6 +267,20 @@ Gates at 11cb80a on a fresh clone (Elena's PC, turn elena/7, CPython 3.14): `ruf
 --check .`, `ruff check .`, `mypy --strict src tests scripts` and `pytest` (697 passed,
 13 skipped, all opt-in) each exit 0.
 
+### QA round 2 at 975b020: what changed (3314dad, 637ff25)
+
+| Finding | Change | Proof |
+| --- | --- | --- |
+| a B1, b N1, c N1 | the write guard's wrapper takes `self` positional only (`run(self, /, *args, **kwargs)`), so a keyword pair named `self` reaches the method; CHANGELOG says any string can be a keyword key, `self` included (0.2.0's `update` already took it, so no upgrade change) | `tests/test_contracts_keywords.py::test_a_keyword_pair_may_be_named_self` (constructor, `extend`, `merge`, `update`, both classes), red on 975b020 |
+| b N2 | GUIDE: from 3.14 `email.message`, and so `http.client` whose messages are `email.message.Message` objects, refuses non-ASCII field names (checked on 3.14.2: `ValueError`; on 3.12.12 accepted) | `tests/test_reference_differences_more.py::test_email_and_http_client_fold_non_ascii_names_only_before_python_3_14` (both classes, version-aware) |
+| c N2 | option (a): the GUIDE Errors row and the CHANGELOG say the lookup of `pop` and `setdefault` is `self[key]`, so a subclass `__getitem__` that writes makes them raise `RuntimeError`; `md[key]` alone still runs it. Behaviour kept: `dict.pop` does not call an overridden `__getitem__` either, and calling the hook outside the guard would reopen round 1's c F2 | `tests/test_hostile_more.py::test_a_getitem_hook_that_writes_is_refused_inside_pop_and_setdefault` (nothing changed after the error) |
+| e F2-N38 | contract: a keyword pair equal to a positional pair is kept by the constructor, `extend`, `merge` and `update` | `tests/test_contracts_keywords.py::test_a_keyword_pair_repeating_a_positional_pair_is_kept`, fails with N38 applied |
+| e F3-N19 | contract: a type whose `__name__` is a fake `str` prints as `?` in the CI key error and the bad-element error | `tests/test_contracts_spoofed.py::test_a_type_name_that_only_pretends_to_be_a_str_prints_as_a_question_mark`, fails with N19 applied |
+
+Gates at 637ff25 on a fresh clone (Elena's PC, turn elena/2, CPython 3.14): `ruff format
+--check .`, `ruff check .`, `mypy --strict src`, `mypy --strict src tests scripts` and
+`pytest` (703 passed, 13 skipped, all opt-in) each exit 0.
+
 ### Disputed findings
 
-None. Every finding of round 1 was reproduced before it was fixed.
+None. Every finding of rounds 1 and 2 was reproduced before it was fixed.
