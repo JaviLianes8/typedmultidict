@@ -6,7 +6,7 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-## [1.0.0] - 2026-10-18
+## [1.0.0] - 2026-10-19
 
 The public API is now stable: `MultiDict`, `CIMultiDict`, `AllItemsView` and
 `AllValuesView`, every method name, signature and default, the error types and the
