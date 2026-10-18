@@ -9,6 +9,7 @@ from collections.abc import Hashable, Iterator, Mapping, MutableMapping
 from typing import Any, ClassVar, TypeVar
 
 from ._guard import exclusive
+from ._pairs import is_str
 from ._state import restore, state_of
 
 K = TypeVar("K", bound=Hashable)
@@ -188,6 +189,6 @@ def _compared(storage: _Storage[Any, Any], fold: bool) -> list[tuple[Any, Any]]:
     if not fold:
         return [(entry.token, entry.value) for entry in storage._live()]
     return [
-        (str.lower(entry.key) if isinstance(entry.key, str) else entry.key, entry.value)
+        (str.lower(entry.key) if is_str(entry.key) else entry.key, entry.value)
         for entry in storage._live()
     ]

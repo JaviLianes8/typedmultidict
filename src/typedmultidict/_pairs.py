@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from itertools import islice
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeGuard, TypeVar, Union
 
 if TYPE_CHECKING:
     from _typeshed import SupportsKeysAndGetItem
@@ -20,13 +20,19 @@ MultiDictInput = Union["SupportsKeysAndGetItem[K, V]", Iterable[tuple[K, V]]]
 _NAME_LIMIT = 40
 
 
+def is_str(obj: object) -> TypeGuard[str]:
+    """Whether ``obj`` really is a ``str``; a faked ``__class__`` (a mock, a proxy) fools
+    isinstance but not ``str.lower``, which would then raise."""
+    return issubclass(type(obj), str)
+
+
 def type_name(obj: object) -> str:
     """The name of ``obj``'s type as plain text, cut to a bounded length."""
     try:
         name: object = type(obj).__name__
     except Exception:
         name = None
-    text = str.__str__(name) if isinstance(name, str) else "?"
+    text = str.__str__(name) if is_str(name) else "?"
     return text if len(text) <= _NAME_LIMIT else text[: _NAME_LIMIT - 3] + "..."
 
 

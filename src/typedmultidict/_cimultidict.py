@@ -6,7 +6,7 @@ from collections.abc import Hashable
 from typing import ClassVar, TypeVar
 
 from ._multidict import MultiDict
-from ._pairs import type_name
+from ._pairs import is_str, type_name
 
 V = TypeVar("V")
 
@@ -31,9 +31,9 @@ class CIMultiDict(MultiDict[str, V]):
     _folds_case: ClassVar[bool] = True
 
     def _token(self, key: str) -> Hashable:
-        if not isinstance(key, str):
+        if not is_str(key):
             raise TypeError(f"{type_name(self)} keys must be str, not {type_name(key)}")
         return str.lower(key)
 
     def _probe(self, key: object) -> Hashable:
-        return str.lower(key) if isinstance(key, str) else _NO_MATCH
+        return str.lower(key) if is_str(key) else _NO_MATCH

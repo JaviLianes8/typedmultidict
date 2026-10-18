@@ -41,7 +41,7 @@ print(params.to_dict())  # {'tag': ['python', 'typing'], 'page': ['2']}
 ```
 
 Assigning replaces every value of a key in the position of its first one; removing can
-take the first value, every value, or the last pair added:
+take the first value, every value, or the last pair in order:
 
 ```python
 from typedmultidict import MultiDict
@@ -127,21 +127,21 @@ print(headers.copy() == headers, headers.copy() is headers)  # True False
 
 | Name | What it does |
 | --- | --- |
-| `MultiDict[K, V](initial=None)` | Ordered multi-value mapping. `initial` is a multi-dict (every pair is copied), a mapping or header object (read through `items()`, else `keys()`) or an iterable of pairs. `K` must be hashable. |
-| `CIMultiDict[V](initial=None)` | `MultiDict[str, V]` whose keys compare with `str.lower`. A non-`str` key raises `TypeError` when added and is absent when looked up. |
+| `MultiDict[K, V](initial=None, /, **kwargs)` | Ordered multi-value mapping. `initial` is a multi-dict (every pair is copied), a mapping or header object (read through `items()`, else `keys()`) or an iterable of pairs; keyword arguments add string-keyed pairs after it, as in `dict()`. `K` must be hashable. |
+| `CIMultiDict[V](initial=None, /, **kwargs)` | `MultiDict[str, V]` whose keys compare with `str.lower`. A non-`str` key raises `TypeError` when added and is absent when looked up. |
 | `md[key]`, `get`, `in`, `keys`, `items`, `values`, `len()`, iteration | The `Mapping` view: first value of each key, keys once each. |
 | `md[key] = value` | Replaces every value of `key` with one, in the place of the first. |
 | `del md[key]`, `pop(key[, default])` | Remove every value of `key` (`pop` returns the first). |
 | `setdefault(key[, default])` | First value of `key`, or adds `default`. |
 | `add(key, value)` | Appends one more pair. |
-| `extend(other)` | Appends every pair of `other`. |
-| `merge(other)` | Appends the pairs whose key is not present yet. |
+| `extend(other=(), /, **kwargs)` | Appends every pair of `other`, then the keyword pairs. |
+| `merge(other=(), /, **kwargs)` | Appends the pairs (keyword pairs last) whose key is not present yet. |
 | `update(other=(), /, **kwargs)` | Replaces the values of each incoming key in place. |
 | `getone(key[, default])` | First value, else `default`, else `KeyError`. |
 | `getall(key[, default])` | New list of every value of `key`; if absent, `default` when given, else an empty list. |
 | `popone(key[, default])` | Removes and returns the first value only. |
 | `popall(key[, default])` | Removes and returns every value as a list. |
-| `popitem()` | Removes and returns the last pair added (`KeyError` when empty). |
+| `popitem()` | Removes and returns the last pair in order (`KeyError` when empty). |
 | `allitems()`, `allvalues()` | Live views of every pair or value (`AllItemsView`, `AllValuesView`); `len()` counts pairs. |
 | `to_dict()` | New `dict` from each key to a new list of its values. |
 | `copy()`, `clear()` | Shallow copy of the same class; remove everything. |
@@ -161,8 +161,9 @@ that would break the `Mapping` contract: `len()` counts keys (use
 key, as Werkzeug's `MultiDict` does. `getall` returns an empty list for a missing key
 instead of raising, and `pop` removes every value of the key.
 
-Like `dict`, a multi-dict is not safe to change from several threads at once without a
-lock. Equality between a plain and a case-insensitive multi-dict folds case, so it is not
+A multi-dict is written in pure Python, so unlike a `dict` it is not thread-safe: share
+one between threads only behind a lock that covers reads as well as writes. Without one,
+concurrent writes can raise `RuntimeError` and leave it inconsistent. Equality between a plain and a case-insensitive multi-dict folds case, so it is not
 transitive across the two kinds. Any other mapping, a `multidict.MultiDict` included, is
 compared as a plain mapping.
 

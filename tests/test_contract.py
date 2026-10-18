@@ -15,19 +15,19 @@ PUBLIC_API: list[str] = ["AllItemsView", "AllValuesView", "CIMultiDict", "MultiD
 
 KEY_DEFAULT = "(self, key: 'K', default: 'Any' = <missing>) -> 'Any'"
 SIGNATURES: dict[str, str] = {
-    "__init__": "(self, initial: 'MultiDictInput[K, V] | None' = None) -> 'None'",
+    "__init__": "(self, initial: 'Any' = None, /, **kwargs: 'Any') -> 'None'",
     "add": "(self, key: 'K', value: 'V') -> 'None'",
     "allitems": "(self) -> 'AllItemsView[K, V]'",
     "allvalues": "(self) -> 'AllValuesView[V]'",
     "clear": "(self) -> 'None'",
     "copy": "(self: 'Self') -> 'Self'",
-    "extend": "(self, other: 'MultiDictInput[K, V]') -> 'None'",
+    "extend": "(self, other: 'Any' = (), /, **kwargs: 'Any') -> 'None'",
     "get": "(self, key: 'K', default: 'Any' = None) -> 'Any'",
     "getall": KEY_DEFAULT,
     "getone": KEY_DEFAULT,
     "items": "(self) -> 'ItemsView[K, V]'",
     "keys": "(self) -> 'KeysView[K]'",
-    "merge": "(self, other: 'MultiDictInput[K, V]') -> 'None'",
+    "merge": "(self, other: 'Any' = (), /, **kwargs: 'Any') -> 'None'",
     "pop": KEY_DEFAULT,
     "popall": KEY_DEFAULT,
     "popitem": "(self) -> 'tuple[K, V]'",

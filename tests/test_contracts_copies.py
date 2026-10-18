@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import copy
 import copyreg
+import operator
 import pickle
+import pickletools
 from collections.abc import Callable
 from typing import Any
 
@@ -138,11 +140,29 @@ def test_a_pickle_from_version_0_1_0_keeps_private_attributes() -> None:
 
 
 @pytest.mark.parametrize("protocol", range(pickle.HIGHEST_PROTOCOL + 1))
-def test_every_view_pickles_as_its_class_called_with_its_multi_dict(protocol: int) -> None:
+def test_every_view_pickles_as_a_public_call_with_its_multi_dict(protocol: int) -> None:
     # The same stream on every Python version, so a view pickled by one loads on another.
     md = MultiDict([("a", 1)])
-    for view in (md.keys(), md.items(), md.values(), md.allitems(), md.allvalues()):
-        reduced = view.__reduce_ex__(protocol)
-        assert isinstance(reduced, tuple)
-        rebuild, args = reduced[:2]
+    views: list[Any] = [md.allitems(), md.allvalues()]
+    for view in views:
+        rebuild, args = view.__reduce_ex__(protocol)[:2]
         assert rebuild is type(view) and len(args) == 1 and args[0] is md
+    named: list[tuple[Any, str]] = [(md.keys(), "keys"), (md.items(), "items")]
+    for view, name in [*named, (md.values(), "values")]:
+        rebuild, args = view.__reduce_ex__(protocol)[:2]
+        assert isinstance(rebuild, operator.methodcaller) and len(args) == 1 and args[0] is md
+        assert rebuild.__reduce__() == (operator.methodcaller, (name,))
+
+
+@pytest.mark.parametrize("protocol", range(pickle.HIGHEST_PROTOCOL + 1))
+def test_view_pickles_name_only_public_modules(protocol: int) -> None:
+    # Private modules may move in any 1.x release; a pickle must never name one.
+    md = CIMultiDict([("A", 1)])
+    for view in (md.keys(), md.items(), md.values(), md.allitems(), md.allvalues()):
+        data = pickle.dumps(view, protocol)
+        names = {str(arg) for op, arg, _ in pickletools.genops(data) if "GLOBAL" in op.name}
+        names |= {str(arg) for op, arg, _ in pickletools.genops(data) if "UNICODE" in op.name}
+        assert not any("typedmultidict._" in name or name.startswith("_") for name in names)
+        assert b"_mapviews" not in data
+        twin = pickle.loads(data)
+        assert type(twin) is type(view) and list(twin) == list(view)

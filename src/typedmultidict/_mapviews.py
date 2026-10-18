@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import collections.abc as abc
+import operator
 from collections.abc import Hashable, Iterator, Mapping
 from typing import Any, TypeVar
 
@@ -12,7 +13,9 @@ V = TypeVar("V")
 # The collections.abc views iterate with generators, which only start (and only look at the
 # multi-dict) on the first next(). These take the multi-dict's iterator at iter() time, so a
 # write between iter() and next() raises RuntimeError, as it does for dict views. They keep
-# the standard names, so repr() reads the same, and pickle at every protocol.
+# the standard names, so repr() reads the same, and pickle at every protocol as a call of
+# the multi-dict's own method: a pickle names only public, stable callables, never this
+# module. The classes stay importable so pickles written by 0.2.0 still load.
 
 
 class KeysView(abc.KeysView[K]):
@@ -22,7 +25,7 @@ class KeysView(abc.KeysView[K]):
         return iter(self._mapping)
 
     def __reduce__(self) -> tuple[Any, ...]:
-        return (type(self), (self._mapping,))
+        return (operator.methodcaller("keys"), (self._mapping,))
 
 
 class ItemsView(abc.ItemsView[K, V]):
@@ -33,7 +36,7 @@ class ItemsView(abc.ItemsView[K, V]):
         return ((key, mapping[key]) for key in iter(mapping))
 
     def __reduce__(self) -> tuple[Any, ...]:
-        return (type(self), (self._mapping,))
+        return (operator.methodcaller("items"), (self._mapping,))
 
 
 class ValuesView(abc.ValuesView[V]):
@@ -44,4 +47,4 @@ class ValuesView(abc.ValuesView[V]):
         return (mapping[key] for key in iter(mapping))
 
     def __reduce__(self) -> tuple[Any, ...]:
-        return (type(self), (self._mapping,))
+        return (operator.methodcaller("values"), (self._mapping,))

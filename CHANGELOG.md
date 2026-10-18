@@ -23,6 +23,19 @@ behaviour described in the README and the guide. Later 1.x releases only add.
 
 ### Changed (upgrading from 0.2.0)
 
+- The constructor, `extend` and `merge` take keyword pairs for string keys, as `update`
+  already did and as in `dict()` and `multidict`: `MultiDict([("a", 1)], b=2)`,
+  `md.extend(c=3)`. Their source argument is positional only and optional, so
+  `extend()` and `merge()` with no argument do nothing. `MultiDict(initial=x)` now stores
+  one pair named `"initial"`, as `dict(initial=x)` does; pass the source positionally.
+- `pop` and `setdefault` refuse, with `RuntimeError` and no change, a write that a key's
+  `__eq__` or `__hash__` makes while they look the key up; before, that write went through.
+- `CIMultiDict` checks the real type of a key, so an object that only claims to be a
+  `str` (a `Mock(spec=str)`, a proxy) is absent on lookup and refused with the documented
+  `TypeError` on write, instead of failing inside `str.lower`.
+- `keys()`, `items()` and `values()` views pickle as a call of that method on the
+  multi-dict (`operator.methodcaller`), so a pickle never names a private module.
+  Pickles of these views written by 0.2.0 still load.
 - Removing pairs no longer scans the whole multi-dict: `del md[key]`, `pop`, `popone`,
   `popall`, assignment and `update` cost time in proportion to the pairs they remove.
   Deleting every key one by one is linear overall instead of quadratic.
@@ -64,7 +77,7 @@ behaviour described in the README and the guide. Later 1.x releases only add.
 - Lookups, `in`, `len()` and adding no longer scan every pair: an index keeps them
   constant time whatever the size.
 - `update` replaces the values of each incoming key in place instead of keeping only the
-  first value of a multi-dict source, and `popitem` removes only the last pair added.
+  first value of a multi-dict source, and `popitem` removes only the last pair.
 - `popall(key, default)` accepts a default of any type.
 - Bulk input is checked in full before anything changes: `md.extend(md)` no longer hangs,
   and a malformed element raises `TypeError` or `ValueError` with its position.

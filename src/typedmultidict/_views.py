@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import reprlib
 from collections.abc import Collection, Hashable, Iterator
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 
 if TYPE_CHECKING:
     from ._storage import _Storage
@@ -39,9 +39,10 @@ class AllItemsView(Collection[tuple[K, V]], Generic[K, V]):
         return ((entry.key, entry.value) for entry in mapping._iterate(mapping._version))
 
     def __contains__(self, item: object) -> bool:
-        if not isinstance(item, tuple) or len(item) != 2:
+        # The real type, as for keys: a faked __class__ is not a pair.
+        if not issubclass(type(item), tuple) or len(pair := cast("tuple[Any, ...]", item)) != 2:
             return False
-        key, value = item
+        key, value = pair
         entries = self._mapping._index.get(self._mapping._probe(key), ())
         return any(entry.value is value or entry.value == value for entry in entries)
 

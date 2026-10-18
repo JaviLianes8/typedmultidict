@@ -94,7 +94,7 @@ class _Mapping(_Storage[K, V]):
         (1, MultiDict([('b', 2)]), None)
         """
         try:
-            first = self[key]
+            first = self._look_up_to_write(key)
         except KeyError:
             if default is _MISSING:
                 raise
@@ -116,10 +116,17 @@ class _Mapping(_Storage[K, V]):
         (1, 9, MultiDict([('a', 1), ('a', 2), ('b', 9)]))
         """
         try:
-            return self[key]
+            return self._look_up_to_write(key)
         except KeyError:
             self[key] = default
         return default
+
+    @exclusive
+    def _look_up_to_write(self, key: K) -> V:
+        # The lookup that starts a write is part of it: a key comparison that writes to the
+        # multi-dict here is refused before anything changes. No user code runs between this
+        # and the guarded write that follows.
+        return self[key]
 
     @exclusive
     def clear(self) -> None:

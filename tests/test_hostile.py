@@ -50,12 +50,19 @@ WRITES: list[Callable[[MultiDict[Any, Any]], object]] = [
     lambda md: md.__delitem__(_Meddler(1)),
     lambda md: md.popone(_Meddler(1)),
     lambda md: md.popall(_Meddler(1)),
+    # A reused key, then a fresh one whose indexing is refused: update is all or nothing.
+    lambda md: md.update([("x", 5), (_Meddler(2), 2)]),
+    # pop and setdefault look the key up first: that lookup is part of the write.
+    lambda md: md.pop(_Meddler(1)),
+    lambda md: md.pop(_Meddler(2), None),
+    lambda md: md.setdefault(_Meddler(1), 9),
+    lambda md: md.setdefault(_Meddler(2), 2),
 ]
 
 
 @pytest.mark.parametrize("write", WRITES)
 @pytest.mark.parametrize("meddle", ["add", "popall", "clear"])
-@pytest.mark.parametrize("nth", [1, 2])
+@pytest.mark.parametrize("nth", [1, 2, 3])
 def test_a_key_comparison_that_writes_is_refused_and_leaves_no_damage(
     write: Callable[[MultiDict[Any, Any]], object], meddle: str, nth: int
 ) -> None:
@@ -79,16 +86,18 @@ def test_a_key_comparison_that_writes_is_refused_and_leaves_no_damage(
 
 
 @pytest.mark.parametrize("meddle", ["add", "popall", "clear"])
-def test_pop_reads_first_so_a_meddling_comparison_leaves_it_consistent(meddle: str) -> None:
+@pytest.mark.parametrize("method", ["pop", "setdefault"])
+def test_pop_and_setdefault_refuse_a_write_made_while_they_look_the_key_up(
+    meddle: str, method: str
+) -> None:
     md: MultiDict[Any, Any] = MultiDict([(_Meddler(1), 1), ("x", 0)])
     calls = {"add": lambda: md.add("y", 1), "popall": lambda: md.popall("x"), "clear": md.clear}
     TARGET["write"] = calls[meddle]
     _Meddler.armed = 1
-    try:
-        md.pop(_Meddler(1))
-    except KeyError:
-        assert meddle == "clear"
+    with pytest.raises(RuntimeError, match="while one of its writes was running"):
+        getattr(md, method)(_Meddler(1), 9)
     _Meddler.armed = 0
+    assert list(md.allitems()) == [(_Meddler(1), 1), ("x", 0)]
     _consistent(md)
 
 

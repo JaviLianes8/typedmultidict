@@ -6,6 +6,7 @@ Third-party references skip when they are not installed.
 from __future__ import annotations
 
 import email.message
+import sys
 import wsgiref.headers
 from typing import Any
 
@@ -81,9 +82,26 @@ def test_email_get_all_of_a_missing_name_is_none_where_ours_is_empty() -> None:
     assert CIMultiDict[str]().getall("x") == []
 
 
-def test_multidict_compares_key_spellings_exactly_across_kinds() -> None:
+def test_multidict_folds_only_the_case_insensitive_side_across_kinds() -> None:
     multidict = pytest.importorskip("multidict")
-    assert multidict.MultiDict([("a", 1)]) == multidict.CIMultiDict([("a", 1)])
-    assert multidict.MultiDict([("A", 1)]) != multidict.CIMultiDict([("a", 1)])
-    assert MultiDict([("a", 1)]) == CIMultiDict([("a", 1)])
-    assert MultiDict([("A", 1)]) == CIMultiDict([("a", 1)])
+    pure = pytest.importorskip("multidict._multidict_py")
+    for ref in (multidict, pure):
+        # Equal when the plain side is already lower case, in either order; not otherwise.
+        assert ref.MultiDict([("a", 1)]) == ref.CIMultiDict([("A", 1)])
+        assert ref.CIMultiDict([("A", 1)]) == ref.MultiDict([("a", 1)])
+        assert ref.MultiDict([("A", 1)]) != ref.CIMultiDict([("a", 1)])
+        assert ref.CIMultiDict([("a", 1)]) != ref.MultiDict([("A", 1)])
+    for plain, folded in (("a", "A"), ("A", "a"), ("A", "A")):
+        assert MultiDict([(plain, 1)]) == CIMultiDict([(folded, 1)])
+        assert CIMultiDict([(folded, 1)]) == MultiDict([(plain, 1)])
+
+
+def test_email_folds_non_ascii_names_only_before_python_3_14() -> None:
+    message = email.message.Message()
+    if sys.version_info >= (3, 14):
+        with pytest.raises(ValueError):
+            message["\u212a"] = "1"
+    else:
+        message["\u212a"] = "1"
+        assert message.get("k") == "1"
+    assert CIMultiDict([("\u212a", "1")]).get("k") == "1"

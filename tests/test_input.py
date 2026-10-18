@@ -90,4 +90,4 @@ def test_none_and_empty_inputs_build_an_empty_mapping() -> None:
     assert len(MultiDict()) == 0
     assert len(MultiDict(None)) == 0
     assert len(MultiDict({})) == 0
-    assert len(MultiDict(initial=[("a", 1)])) == 1
+    assert len(MultiDict(None, **{})) == 0

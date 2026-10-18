@@ -28,7 +28,8 @@ class MultiDict(_MultiValues[K, V]):
     normal mapping (``len()`` counts keys). The multi-value surface (``add``, ``getall``,
     ``allitems`` and friends) sees every stored pair in insertion order. ``initial`` is a
     multi-dict (every pair is copied), a mapping or header object (read through ``items()``,
-    else ``keys()``) or an iterable of ``(key, value)`` pairs.
+    else ``keys()``) or an iterable of ``(key, value)`` pairs; keyword arguments add pairs
+    with string keys after it, as in ``dict()``.
 
     >>> from typedmultidict import MultiDict
     >>> md = MultiDict([("tag", "a"), ("page", "2"), ("tag", "b")])
@@ -40,10 +41,18 @@ class MultiDict(_MultiValues[K, V]):
     (MultiDict([('tag', 'c')]), ['tag'], True)
     """
 
-    def __init__(self, initial: MultiDictInput[K, V] | None = None) -> None:
+    @overload
+    def __init__(self, initial: MultiDictInput[K, V] | None = None, /) -> None: ...
+    @overload
+    def __init__(
+        self: MultiDict[str, V], initial: MultiDictInput[str, V] | None = None, /, **kwargs: V
+    ) -> None: ...
+
+    def __init__(self, initial: Any = None, /, **kwargs: Any) -> None:
         self._reset()
-        if initial is not None:
-            self.extend(initial)  # through extend, so a subclass hook sees the input
+        if initial is not None or kwargs:
+            # Through extend, so a subclass hook sees the input.
+            self.extend(() if initial is None else initial, **kwargs)
 
     @exclusive
     def _reset(self) -> None:
@@ -66,29 +75,43 @@ class MultiDict(_MultiValues[K, V]):
         """
         self._append([(self._token(key), key, value)])
 
+    @overload
+    def extend(self, other: MultiDictInput[K, V] = ..., /) -> None: ...
+    @overload
+    def extend(
+        self: MultiDict[str, V], other: MultiDictInput[str, V] = ..., /, **kwargs: V
+    ) -> None: ...
+
     @exclusive
-    def extend(self, other: MultiDictInput[K, V]) -> None:
-        """Append every pair of a mapping, multi-dict or iterable of pairs.
+    def extend(self, other: Any = (), /, **kwargs: Any) -> None:
+        """Append every pair of a mapping, multi-dict or iterable of pairs, then the keywords.
 
         >>> from typedmultidict import MultiDict
         >>> md = MultiDict([("a", 1)])
-        >>> md.extend([("a", 2), ("b", 3)])
+        >>> md.extend([("a", 2), ("b", 3)], c=4)
         >>> md
-        MultiDict([('a', 1), ('a', 2), ('b', 3)])
+        MultiDict([('a', 1), ('a', 2), ('b', 3), ('c', 4)])
         """
-        self._append(self._collect(other, {}))
+        self._append(self._collect(other, kwargs))
+
+    @overload
+    def merge(self, other: MultiDictInput[K, V] = ..., /) -> None: ...
+    @overload
+    def merge(
+        self: MultiDict[str, V], other: MultiDictInput[str, V] = ..., /, **kwargs: V
+    ) -> None: ...
 
     @exclusive
-    def merge(self, other: MultiDictInput[K, V]) -> None:
+    def merge(self, other: Any = (), /, **kwargs: Any) -> None:
         """Append the pairs whose key is not present yet; keys already here are skipped.
 
         >>> from typedmultidict import MultiDict
         >>> md = MultiDict([("a", 1)])
-        >>> md.merge([("a", 2), ("b", 3), ("b", 4)])
+        >>> md.merge([("a", 2), ("b", 3), ("b", 4)], c=5)
         >>> md
-        MultiDict([('a', 1), ('b', 3), ('b', 4)])
+        MultiDict([('a', 1), ('b', 3), ('b', 4), ('c', 5)])
         """
-        incoming = self._collect(other, {})
+        incoming = self._collect(other, kwargs)
         self._append([item for item in incoming if item[0] not in self._index])
 
     @overload

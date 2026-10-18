@@ -57,7 +57,8 @@ def test_mapping_views_keep_the_standard_names_and_pickle() -> None:
 
 def test_the_constructor_goes_through_extend_so_subclass_hooks_see_its_input() -> None:
     class Checked(MultiDict[str, int]):
-        def extend(self, other: Any) -> None:
+        # The one-argument form of 0.2.0 still works when no keyword pairs are passed.
+        def extend(self, other: Any) -> None:  # type: ignore[override]
             pairs = list(other)
             if any(value < 0 for _, value in pairs):
                 raise ValueError("negative")

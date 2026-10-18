@@ -33,18 +33,21 @@ print(list(md.items()), md.getall("a"))  # [('a', 1), ('b', 2)] [1, 3]
 | Call | Effect |
 | --- | --- |
 | `md.add(k, v)` | appends one pair |
-| `md.extend(other)` | appends every pair of `other` |
-| `md.merge(other)` | appends the pairs of `other` whose key is not present before the call |
+| `md.extend(other, **kw)` | appends every pair of `other`, then the keyword pairs |
+| `md.merge(other, **kw)` | appends the pairs of `other` and the keyword pairs whose key is not present before the call |
 | `md[k] = v` | the first pair of `k` becomes `(k, v)` in place, every later pair of `k` goes; a new key goes to the end |
 | `md.update(other, **kw)` | for each incoming key, its incoming values overwrite its existing pairs in order; extra incoming values go to the end, extra existing pairs go |
 | `md.setdefault(k, v)` | the first value of `k`; when absent, appends `(k, v)` and returns `v` |
 | `del md[k]`, `md.pop(k)` | remove every pair of `k` (`pop` returns the first value) |
 | `md.popone(k)` | removes and returns only the first value of `k` |
 | `md.popall(k)` | removes every pair of `k` and returns their values |
-| `md.popitem()` | removes and returns the last pair added; other pairs of its key stay |
+| `md.popitem()` | removes and returns the last pair in order (an in-place write does not move a pair); other pairs of its key stay |
 | `md.clear()` | removes everything |
 
-`other` may be a multi-dict (every pair is copied, not only first values), anything with
+The constructor takes the same arguments as `extend`: `MultiDict([("a", 1)], b=2)`.
+`other` is positional only and optional, so keyword pairs may use any string key, as in
+`dict()`. `other` may be a multi-dict (every pair is copied, not only first values),
+anything with
 an `items()` method (read through `items()`: a `dict`, or a header object such as an
 `http.client.HTTPMessage`, an `email.message.Message`, a `wsgiref.headers.Headers` or a
 `multidict.CIMultiDict`, each of which lists every field there), anything else with
@@ -75,9 +78,11 @@ print(headers.getall("SET-COOKIE"), headers["x-id"])  # ['a=1', 'b=2'] 7
 `CIMultiDict[V]` is a `MultiDict[str, V]` whose keys are compared after `str.lower`.
 RFC 9110 section 5.1 states that HTTP field names are case-insensitive, and every
 case-insensitive reference checked here (multidict, Werkzeug's `Headers`, requests,
-`email.message` and `http.client`, `wsgiref.headers`) folds with `str.lower` too, so all
-of them agree on non-ASCII names as well: `"K"` (Kelvin sign) matches `"k"`, while
-`"Straße"` does not match `"STRASSE"` (`str.casefold` would say it does).
+`email.message` and `http.client`, `wsgiref.headers`) folds with `str.lower` too, so they
+agree on non-ASCII names as well: `"K"` (Kelvin sign) matches `"k"`, while
+`"Straße"` does not match `"STRASSE"` (`str.casefold` would say it does). One
+exception: from Python 3.14, `email.message` refuses a field name outside printable ASCII
+with `ValueError` instead of folding it.
 
 - Every pair keeps the spelling it was added with; `md[k] = v` and `update` store the
   new spelling. Iteration and `to_dict` show each key in the spelling of its first pair.
@@ -106,8 +111,9 @@ counts, even replacing a value in place, which `dict` allows.
   `CIMultiDict` and even against another library's case-insensitive mapping.
 - Multi-dicts are unhashable. `copy()` and `copy.copy` are shallow; `copy.deepcopy` and
   `pickle` work, keep subclass attributes and slots, and allow a multi-dict that contains
-  itself. Pickles name `typedmultidict.MultiDict` / `CIMultiDict`; pickles written by 0.1.0
-  and 0.2.0 load.
+  itself. Pickles name only public, stable callables: `typedmultidict.MultiDict` /
+  `CIMultiDict`, `AllItemsView` / `AllValuesView`, and `operator.methodcaller` for the
+  `keys()`, `items()` and `values()` views. Pickles written by 0.1.0 and 0.2.0 load.
 
 ## Errors
 
@@ -119,10 +125,11 @@ counts, even replacing a value in place, which `dict` allows.
 | bulk element whose length is not 2 | `ValueError` naming its position and length |
 | non-`str` key added to a `CIMultiDict` | `TypeError` naming the type |
 | change during iteration (also between `iter()` and the first item) | `RuntimeError` |
-| a key's `__eq__` or `__hash__` writes to the same multi-dict during a write | `RuntimeError`, nothing changed |
+| a key's `__eq__` or `__hash__` writes to the same multi-dict during a write (for `pop` and `setdefault`, the lookup they start with counts as part of it) | `RuntimeError`, nothing changed |
 
-`KeyError` carries the key you passed, like `dict`. Every other message names a position,
-a length or a type (at most 40 characters of its name) and never includes a value.
+No message ever includes a value. `KeyError` for an absent key carries the key you
+passed, like `dict`; messages about bulk input or keys name a position, a length or a
+type (at most 40 characters of its name). The rest are fixed sentences.
 
 ## Cost
 
@@ -132,8 +139,10 @@ Every operation costs time in proportion to the pairs it reads or removes: looku
 linear in their input. Removed pairs leave holes that are swept out once they outnumber
 the live pairs, so deleting every key one by one is linear overall.
 
-A multi-dict is not safe to change from several threads at once without a lock, like
-`dict` and every reference listed below. Key comparisons run your code in the middle of
+A multi-dict is pure Python, so unlike a `dict` (whose single operations are atomic in
+CPython) it is not thread-safe: share one between threads only behind a lock that covers
+reads as well as writes. Without one, concurrent writes can raise `RuntimeError` and leave
+the multi-dict inconsistent for good. Key comparisons run your code in the middle of
 a write; reading the multi-dict from there is fine, writing to it raises `RuntimeError`.
 Keys must keep the hash contract: a key whose hash or equality changes between calls
 (or raises only sometimes) can leave a failed bulk write half undone, as it can corrupt
@@ -177,7 +186,7 @@ The deliberate differences, each shown live by `tests/test_reference_differences
 | Werkzeug `Headers`, `email`, `wsgiref` | `len()` counts field lines | `len()` counts names |
 | Werkzeug `Headers` | `popitem()` when empty raises `IndexError`; values become `str` | `KeyError`; values are stored as given |
 | `email.message` | `get_all(missing)` is `None` | `getall(missing)` is `[]` |
-| multidict | a plain and a case-insensitive multi-dict differing only in key case are unequal | equal after folding string keys |
+| multidict | a plain and a case-insensitive multi-dict differing only in key case are equal only when the plain one's keys are already lower case (only the case-insensitive side is folded) | equal after folding string keys on both sides |
 | Werkzeug `Headers` | deleting a missing name is silent | `del` raises `KeyError` |
 | multidict (C extension) | bulk input other than a multi-dict is read through `items()` or by iterating it, never through `keys()` | an object with only `keys()` and `[]` is read like `dict.update` reads it |
 | multidict (pure-Python fallback) | anything with `keys()` is read through `keys()` and `[]`, so a header object repeats the first value of a repeated name | read through `items()` first: every field is kept |

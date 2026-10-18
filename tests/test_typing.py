@@ -58,6 +58,12 @@ reveal_type(ci.get("a", b""))
 reveal_type(ci.setdefault("a", b""))
 reveal_type(ci["a"])
 reveal_type(md.pop("a", 0))
+reveal_type(MultiDict(a=1))
+reveal_type(CIMultiDict([("a", b"")], b=b""))
+md.extend(c=3)
+md.merge([("a", 1)], d=4)
+MultiDict[int, int]().extend(x=1)
+bad: MultiDict[int, int] = MultiDict(x=1)
 """
 
 # Lines 27 onwards: what every other public method returns, with and without a default.
@@ -143,9 +149,16 @@ def test_every_other_public_method_carries_its_types(mypy_output: str) -> None:
         assert _revealed(mypy_output, line) == expected, line
 
 
+def test_keyword_pairs_build_and_extend_string_keyed_multi_dicts(mypy_output: str) -> None:
+    assert _revealed(mypy_output, 47) == "typedmultidict._multidict.MultiDict[str, int]"
+    assert _revealed(mypy_output, 48) == "typedmultidict._cimultidict.CIMultiDict[bytes]"
+    for line in (51, 52):
+        assert re.search(rf"snippet\.py:{line}: error", mypy_output), (line, mypy_output)
+
+
 def test_no_other_line_has_an_error(mypy_output: str) -> None:
     lines = {int(n) for n in re.findall(r"snippet\.py:(\d+): error", mypy_output)}
-    assert lines == set(range(20, 27))
+    assert lines == set(range(20, 27)) | {51, 52}
 
 
 def _revealed(output: str, line: int) -> str:

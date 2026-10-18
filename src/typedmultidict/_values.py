@@ -108,7 +108,7 @@ class _MultiValues(_Mapping[K, V]):
 
     @exclusive
     def popitem(self) -> tuple[K, V]:
-        """Remove and return the last pair added; other values of its key stay.
+        """Remove and return the last pair in order; other values of its key stay.
 
         >>> from typedmultidict import MultiDict
         >>> md = MultiDict([("a", 1), ("b", 2), ("a", 3)])
