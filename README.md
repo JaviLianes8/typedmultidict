@@ -1,5 +1,7 @@
 # typedmultidict
 
+[![Lianes8 Certified](https://lianes8studio.com/certified/lianes8-certified-badge.svg)](https://lianes8studio.com/certified)
+
 Pure-Python typed ordered multi-value dictionary with a case-insensitive variant.
 
 A `MultiDict` keeps every `(key, value)` pair of a query string or a header block, in
