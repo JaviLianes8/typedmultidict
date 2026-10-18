@@ -30,6 +30,11 @@ behaviour described in the README and the guide. Later 1.x releases only add.
   one pair named `"initial"`, as `dict(initial=x)` does; pass the source positionally.
 - `pop` and `setdefault` refuse, with `RuntimeError` and no change, a write that a key's
   `__eq__` or `__hash__` makes while they look the key up; before, that write went through.
+  The lookup is `self[key]`, so a subclass `__getitem__` that writes to the multi-dict
+  (to fill in a missing key, say) makes `pop` and `setdefault` raise `RuntimeError` too;
+  `md[key]` alone still runs it.
+- A keyword pair may be named `self`, as in `dict(self=1)`: `MultiDict(self=1)`,
+  `extend`, `merge` and `update` store it; in 0.2.0 `update(self=1)` raised `TypeError`.
 - `CIMultiDict` checks the real type of a key, so an object that only claims to be a
   `str` (a `Mock(spec=str)`, a proxy) is absent on lookup and refused with the documented
   `TypeError` on write, instead of failing inside `str.lower`.

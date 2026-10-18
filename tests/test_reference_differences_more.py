@@ -6,6 +6,7 @@ Third-party references skip when they are not installed.
 from __future__ import annotations
 
 import email.message
+import http.client
 import sys
 import wsgiref.headers
 from typing import Any
@@ -96,8 +97,9 @@ def test_multidict_folds_only_the_case_insensitive_side_across_kinds() -> None:
         assert CIMultiDict([(folded, 1)]) == MultiDict([(plain, 1)])
 
 
-def test_email_folds_non_ascii_names_only_before_python_3_14() -> None:
-    message = email.message.Message()
+@pytest.mark.parametrize("kind", [email.message.Message, http.client.HTTPMessage])
+def test_email_and_http_client_fold_non_ascii_names_only_before_python_3_14(kind: Any) -> None:
+    message = kind()
     if sys.version_info >= (3, 14):
         with pytest.raises(ValueError):
             message["\u212a"] = "1"

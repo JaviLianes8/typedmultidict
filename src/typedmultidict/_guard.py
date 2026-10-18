@@ -19,8 +19,9 @@ def exclusive(method: F) -> F:
     instead of corrupting it.
     """
 
+    # ``self`` is positional only, so a keyword pair named "self" reaches the method.
     @functools.wraps(method)
-    def run(self: Any, *args: Any, **kwargs: Any) -> Any:
+    def run(self: Any, /, *args: Any, **kwargs: Any) -> Any:
         if self._busy:
             raise RuntimeError(_REENTERED)
         self._busy = True

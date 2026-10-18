@@ -72,3 +72,25 @@ def test_a_subclass_constructor_hook_sees_the_keyword_pairs() -> None:
 
     md = Hooked(a=1)
     assert seen == [((), {"a": 1})] and md["a"] == 1
+
+
+@pytest.mark.parametrize("cls", [MultiDict, CIMultiDict])
+def test_a_keyword_pair_may_be_named_self(cls: Any) -> None:
+    assert list(cls(self=1).allitems()) == [("self", 1)]
+    for name in ("extend", "merge", "update"):
+        md = cls()
+        getattr(md, name)(self=1)
+        assert list(md.allitems()) == [("self", 1)], name
+
+
+def test_a_keyword_pair_repeating_a_positional_pair_is_kept() -> None:
+    assert list(MultiDict([("a", 1)], a=1).allitems()) == [("a", 1), ("a", 1)]
+    md = MultiDict([("a", 0)])
+    md.extend([("a", 1)], a=1)
+    assert list(md.allitems()) == [("a", 0), ("a", 1), ("a", 1)]
+    md = MultiDict()
+    md.merge([("a", 1)], a=1)
+    assert list(md.allitems()) == [("a", 1), ("a", 1)]
+    md = MultiDict([("a", 0)])
+    md.update([("a", 1)], a=1)
+    assert list(md.allitems()) == [("a", 1), ("a", 1)]

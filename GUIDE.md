@@ -80,8 +80,9 @@ case-insensitive reference checked here (multidict, Werkzeug's `Headers`, reques
 `email.message` and `http.client`, `wsgiref.headers`) folds with `str.lower` too, so they
 agree on non-ASCII names as well: `"K"` (Kelvin sign) matches `"k"`, while
 `"Straße"` does not match `"STRASSE"` (`str.casefold` would say it does). One
-exception: from Python 3.14, `email.message` refuses a field name outside printable ASCII
-with `ValueError` instead of folding it.
+exception: from Python 3.14, `email.message`, and so `http.client` whose messages are
+`email.message.Message` objects, refuses a field name outside printable ASCII: setting one
+raises `ValueError` instead of folding it.
 
 - Every pair keeps the spelling it was added with; `md[k] = v` and `update` store the
   new spelling. Iteration and `to_dict` show each key in the spelling of its first pair.
@@ -124,7 +125,7 @@ counts, even replacing a value in place, which `dict` allows.
 | bulk element whose length is not 2 | `ValueError` naming its position and length |
 | non-`str` key added to a `CIMultiDict` | `TypeError` naming the type |
 | change during iteration (also between `iter()` and the first item) | `RuntimeError` |
-| a key's `__eq__` or `__hash__` writes to the same multi-dict during a write (for `pop` and `setdefault`, the lookup they start with counts as part of it) | `RuntimeError`, nothing changed |
+| a key's `__eq__` or `__hash__` writes to the same multi-dict during a write (for `pop` and `setdefault`, the lookup they start with counts as part of it, so a subclass `__getitem__` that writes makes them raise too) | `RuntimeError`, nothing changed |
 
 No message ever includes a value. `KeyError` for an absent key carries the key you
 passed, like `dict`; messages about bulk input or keys name a position, a length or a

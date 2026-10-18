@@ -44,3 +44,23 @@ def test_a_fake_str_key_compares_unequal_instead_of_raising() -> None:
 def test_a_fake_tuple_is_not_a_pair_in_a_view() -> None:
     fake = mock.Mock(spec=tuple)
     assert fake not in MultiDict([("a", 1)]).allitems()
+
+
+def _type_with_a_fake_str_name() -> type:
+    class FakeStr:
+        __class__ = str  # type: ignore[assignment]
+
+    class Meta(type):
+        @property
+        def __name__(cls) -> Any:  # type: ignore[override]
+            return FakeStr()
+
+    return Meta("Odd", (), {})
+
+
+def test_a_type_name_that_only_pretends_to_be_a_str_prints_as_a_question_mark() -> None:
+    odd = _type_with_a_fake_str_name()
+    with pytest.raises(TypeError, match=r"^CIMultiDict keys must be str, not \?$"):
+        CIMultiDict[int]().add(odd(), 1)
+    with pytest.raises(TypeError, match=r"^element #0 is not a \(key, value\) pair: \?$"):
+        MultiDict([odd()])

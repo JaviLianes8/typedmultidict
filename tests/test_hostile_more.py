@@ -83,3 +83,23 @@ def test_a_falsy_non_none_initial_is_still_read() -> None:
 
 def _loose(value: object) -> Any:
     return value
+
+
+class _Lazy(MultiDict[str, Any]):
+    def __getitem__(self, key: str) -> Any:
+        try:
+            return super().__getitem__(key)
+        except KeyError:
+            self.add(key, "made")
+            return "made"
+
+
+def test_a_getitem_hook_that_writes_is_refused_inside_pop_and_setdefault() -> None:
+    # pop and setdefault start their write with self[key], so a subclass __getitem__ that
+    # writes is a write inside a write; through md[k] alone the same hook works.
+    assert _Lazy()["x"] == "made"
+    for name, args in (("pop", ("x", None)), ("setdefault", ("x", 1))):
+        md = _Lazy()
+        with pytest.raises(RuntimeError, match="written to while one of its writes"):
+            getattr(md, name)(*args)
+        assert list(md.allitems()) == [], name
