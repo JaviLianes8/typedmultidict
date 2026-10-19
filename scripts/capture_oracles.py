@@ -2,6 +2,8 @@
 
 usage: python scripts/capture_oracles.py [scenarios-per-reference] [seed]
 
+The defaults (100 scenarios per reference, seed 2026) reproduce the committed runs.
+
 Writes tests/fixtures/oracle_runs.json: for every reference, the scenarios and what the
 reference returned and showed after each step. Run it with multidict, werkzeug and
 requests installed (the dev extras); the output records their versions.
@@ -44,7 +46,7 @@ def capture(count: int, seed: int) -> dict[str, object]:
 
 
 def main() -> int:
-    count = int(sys.argv[1]) if len(sys.argv) > 1 else 120
+    count = int(sys.argv[1]) if len(sys.argv) > 1 else 100
     seed = int(sys.argv[2]) if len(sys.argv) > 2 else 2026
     data = capture(count, seed)
     out = ROOT / "tests" / "fixtures" / "oracle_runs.json"

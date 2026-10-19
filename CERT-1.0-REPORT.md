@@ -114,7 +114,7 @@ Three kinds of truth, none of them the library's own output:
   random operations (`tests/test_abc_mixins.py`).
 - **Fetched sources.** `scripts/fetch_sources.py` fetches RFC 9110, the Python 3.14
   `collections.abc`, `email.compat32-message` and `wsgiref` pages, the multidict and
-  Werkzeug docs and requests' `structures.py` (v2.32.3) into the git-ignored
+  Werkzeug docs and requests' `structures.py` (v2.34.2) into the git-ignored
   `tests/sources/`; `MANIFEST.json` records URL, date, size, SHA-256 and licence, and
   `tests/test_sources.py` locates every cited fact in those copies.
 
@@ -281,6 +281,19 @@ Gates at 637ff25 on a fresh clone (Elena's PC, turn elena/2, CPython 3.14): `ruf
 --check .`, `ruff check .`, `mypy --strict src`, `mypy --strict src tests scripts` and
 `pytest` (703 passed, 13 skipped, all opt-in) each exit 0.
 
+### Independent review round 1 at 5f6b228: what changed
+
+The reviewer scored items 1 to 18 by running them: 16 PASS, item 17 pending the merge,
+item 11 FAIL (so item 16 FAIL until a re-review), plus three observations.
+
+| Finding | Change | Proof |
+| --- | --- | --- |
+| R1 item 11 | the README Why section said behaviour was checked against "all of the above", which included `orderedmultidict`, never run against the library; it now names only what is checked: multidict, Werkzeug, requests and the standard library | README; `twine check --strict` and `tests/test_docs.py` rerun |
+| R1 item 16 | follows from item 11; re-review requested | |
+| OBS a | requests' `structures.py` version in this report corrected to v2.34.2, as in the manifest, `fetch_sources.py` and the GUIDE | this report, Ground truth |
+| OBS b | `scripts/capture_oracles.py` now defaults to 100 scenarios per reference (seed 2026), the size of the committed fixture, and says so in its usage text | script |
+| OBS c, d, e | lens d's ground was rerun by the reviewer at 5f6b228 (archives, clean venvs, upgrade from PyPI 0.2.0, 3.10 to 3.14t), all green; the summaries of lens a round 6 and of this review are recorded here and in the lens table at finalize | |
+
 ### Disputed findings
 
-None. Every finding of rounds 1 and 2 was reproduced before it was fixed.
+None. Every finding of rounds 1 and 2 and of review round 1 was reproduced before it was fixed.

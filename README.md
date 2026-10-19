@@ -183,8 +183,8 @@ value is a common need. The established options each make a trade-off:
 
 `typedmultidict` is a single, standalone implementation with zero runtime dependencies
 and `py.typed`: a true `MutableMapping`, the full multi-value API, pair order kept exactly,
-and behaviour checked call by call against all of the above (see the
-[guide](https://github.com/JaviLianes8/typedmultidict/blob/main/GUIDE.md)).
+and behaviour checked call by call against multidict, Werkzeug, requests and the standard
+library (see the [guide](https://github.com/JaviLianes8/typedmultidict/blob/main/GUIDE.md)).
 
 ## License
 
