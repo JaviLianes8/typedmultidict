@@ -15,7 +15,11 @@ Progress:
 - [x] Independent reviewer (item 16): round 4 PASS at d86de92, every item PASS
 - [x] Gates (item 15): at 926996d on a fresh clone (laptop, CPython 3.14), `ruff format --check .`,
   `ruff check .`, `mypy --strict src` (and `src tests scripts`) and `pytest` each exit 0
-- [ ] PR open and trace guard CLEAN (item 17); merge and publish left to the maintainer
+- [x] Final gates at 08bc2d9 on a fresh clone of `release/1.0.0` (CPython 3.13.2): the four
+  gates exit 0 (`pytest` 703 passed, 13 skipped, all opt-in), `python -m build`, `twine check
+  --strict` on both archives, the suite of the sdist run against the installed wheel in a
+  throwaway venv (703 passed, 13 skipped) and the wheel e2e test (5 passed)
+- [x] PR #3 open and trace guard CLEAN (item 17); merge and publish left to the maintainer
 
 ## Baseline on 0.2.0 (before any change)
 
