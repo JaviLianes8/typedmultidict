@@ -11,8 +11,8 @@ Progress:
 - [x] Packaging, e2e and upgrade from PyPI 0.2.0 (items 8, 13, 14)
 - [x] Every interpreter on this PC (item 10)
 - [x] Bulk input read through `items()`, author mutation round 3 (items 1, 7, 18)
-- [x] Five QA lenses report PASS (item 19): last rounds at 5f6b228 and 825b992
-- [x] Independent reviewer (item 16): round 3 PASS at 3931de7
+- [x] Five QA lenses report PASS (item 19): last rounds at d86de92, 5f6b228 and 825b992
+- [x] Independent reviewer (item 16): round 4 PASS at d86de92, every item PASS
 - [x] Gates (item 15): at 926996d on a fresh clone (laptop, CPython 3.14), `ruff format --check .`,
   `ruff check .`, `mypy --strict src` (and `src tests scripts`) and `pytest` each exit 0
 - [ ] PR open and trace guard CLEAN (item 17); merge and publish left to the maintainer
@@ -361,6 +361,64 @@ No change to `src`, tests or packaging; this report only.
 Recorded in 1a1cf31. Gates at 1a1cf31: `ruff format --check .`, `ruff check .` and `mypy --strict
 src` on this PC, and `pytest` on a fresh clone (Elena's PC, turn elena/1, CPython 3.14: 703
 passed, 13 skipped, all opt-in), each exit 0.
+
+## Final verdicts
+
+### QA lenses (item 19)
+
+Last round of each lens. Rounds count every review of that lens on this branch (the lens
+table above). Reports stay in the maintainer's local QA folder `typedmultidict-cert/` and
+are not committed.
+
+| Lens | Rounds | Final verdict | Report | Commit |
+| --- | --- | --- | --- | --- |
+| a. API and docs | 6 | PASS | `lens-a-r2/` (evidence in `work/`: 22 probe groups, 57 assertions, 0 failures on 3.10.19, 3.13.2 and 3.14.2) | 5f6b228 |
+| b. Correctness and ground truth | 6 | PASS | `lens-b-r2/REPORT.md` | 5f6b228 |
+| c. Adversarial and robustness | 9 | PASS | `lens-c-r3/` (evidence in `work4/`: Elena sweep on 3.14, console log, per-interpreter outputs) | d86de92 |
+| d. Packaging and real e2e | 3 | PASS | this report, lens table (d round 3), ground rerun by the reviewer at d86de92 | 825b992 |
+| e. Contract strength | 4 | PASS | `lens-e-r2/REPORT.md` (41 mutants, 41 killed) | 5f6b228 |
+
+Lens a, last round: A1 to A4 and B1 confirmed fixed. 48 view pickles (both classes,
+`keys`, `items`, `values`, every protocol) name only `operator.methodcaller` and
+`typedmultidict.MultiDict`; the constructor is `(initial=None, /, **kwargs)`, and
+`MultiDict(initial=x)` stores one pair named `"initial"`; "last pair in order" everywhere;
+a keyword pair named `self` is stored by the constructor, `extend`, `merge` and `update` of
+both classes; 6 README and 2 GUIDE blocks match their comments, 63 doctests pass,
+`mypy --strict src` is clean.
+
+Lens c, last round (d86de92): the sweep on Elena's PC found no defect. The two timing
+probes it flagged (L01, K12) were timed again and are linear; one message probe (S02b) was
+an artifact of the probe, as the reviewer confirmed by rerunning it (messages are bounded).
+Concurrent unlocked writes still corrupt a multi-dict, as the README and GUIDE say.
+
+No source file, test or packaging file changed between 5f6b228 and d86de92; only this
+report did.
+
+### Independent review round 4 at d86de92: scorecard (item 16)
+
+Fresh clone, heavy work on Elena's PC under turns (all released, work folder deleted).
+
+| Item | Verdict | Evidence |
+| --- | --- | --- |
+| 1 | PASS | signatures frozen by `tests/test_contract.py`: `__init__(initial=None, /, **kwargs)`, `update`, `extend`, `merge` `(other=(), /, **kwargs)` |
+| 2 | PASS | `__all__` has exactly the 4 public names; docs import no private module |
+| 3 | PASS | every public class and method has a runnable example; doctests and README/GUIDE tests pass |
+| 4 | PASS | `mypy --strict src` (11 files) and `src tests scripts` (55 files) clean; `py.typed` ships; 17 `reveal_type` checks in a strict consumer show no `Any` |
+| 5 | PASS | messages bounded (a 100 000-character type name gives a 74 to 79 character message; a raising `__name__` gives `?`); no value echoed; `KeyError(key)` carries the key, as `dict` and the GUIDE say |
+| 6 | PASS | 12 own mutants on `_values.py` and `_pairs.py`, each applied alone with `pytest -x`: 12 killed, control green after |
+| 7 | PASS | MANIFEST lists 7 sources (URL, date, SHA-256, licence); `fetch_sources.py` exits 0 and `tests/test_sources.py` passes; `capture_oracles.py` regenerates the same runs and seed (only the date differs); live oracles green |
+| 8 | PASS | wheel and sdist installed in clean venvs and used with `-I` from outside the tree; PyPI 0.2.0 pickle loads after an in-place upgrade to the 1.0.0 wheel; e2e plus live oracles: 716 passed, 0 skipped |
+| 9 | PASS | fuzz and robustness suites green (lens c sweep confirmed) |
+| 10 | PASS | 3.10.19: 708 passed, 8 skipped (opt-in and 2 `tomllib`); 3.11.14, 3.12.12, 3.13.2, 3.14.2, 3.14.2t: 710 passed, 6 skipped (opt-in) |
+| 11 | PASS | `twine check --strict` on both archives; every link absolute; the Why facts rechecked live (multidict 7.1.0 has 170 wheels, 169 compiled and 1 pure; orderedmultidict 1.0.2 needs `six`) |
+| 12 | PASS | `## [1.0.0] - 2026-10-19` |
+| 13 | PASS | METADATA: 1.0.0, `5 - Production/Stable`, 3.10 to 3.14, MIT, Homepage, Source, Issues, Changelog, keywords, no runtime dependencies |
+| 14 | PASS | wheel: the 11 modules, `py.typed`, LICENSE and metadata; sdist has no stray files |
+| 15 | PASS | `ruff format --check .`, `ruff check .`, `mypy --strict src` and `pytest` each exit 0, locally and on a fresh clone |
+| 16 | PASS | this scorecard |
+| 17 | PASS | PR #3 from `release/1.0.0` open; trace guard CLEAN at finalize; merge and publish left to the maintainer |
+| 18 | PASS | author tables (36 and 14 mutants) above; reviewer's 12 mutants killed |
+| 19 | PASS | each lens's evidence checked against its commit; lens d ground rerun at d86de92 |
 
 ### Disputed findings
 
