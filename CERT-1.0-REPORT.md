@@ -343,6 +343,10 @@ or `pyproject.toml` changed since 5f6b228, so items 1 to 10 and 18 carry over.
 | --- | --- | --- |
 | R3 summary | this section records the review, whose own report could not be written; the last round of each lens is in the lens table and items 16 and 19 are checked in the progress list | this report |
 
+Recorded in 1a5730d. Gates at 1a5730d on a fresh clone (Elena's PC, turn elena/4, CPython
+3.14): `ruff format --check .`, `ruff check .`, `mypy --strict src`, `mypy --strict src tests
+scripts` and `pytest` (703 passed, 13 skipped, all opt-in) each exit 0.
+
 ### Disputed findings
 
 None. Every finding of rounds 1 and 2 and of review rounds 1 to 3 was reproduced or recorded before it was fixed.
