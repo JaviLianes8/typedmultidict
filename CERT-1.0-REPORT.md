@@ -358,6 +358,10 @@ Lens c re-checked its round 2 findings and swept the changed code; verdict PASS.
 
 No change to `src`, tests or packaging; this report only.
 
+Recorded in 1a1cf31. Gates at 1a1cf31: `ruff format --check .`, `ruff check .` and `mypy --strict
+src` on this PC, and `pytest` on a fresh clone (Elena's PC, turn elena/1, CPython 3.14: 703
+passed, 13 skipped, all opt-in), each exit 0.
+
 ### Disputed findings
 
 None. Every finding of rounds 1 to 3 and of review rounds 1 to 3 was reproduced or recorded before it was fixed.
