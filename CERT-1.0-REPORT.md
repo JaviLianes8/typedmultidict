@@ -294,6 +294,12 @@ item 11 FAIL (so item 16 FAIL until a re-review), plus three observations.
 | OBS b | `scripts/capture_oracles.py` now defaults to 100 scenarios per reference (seed 2026), the size of the committed fixture, and says so in its usage text | script |
 | OBS c, d, e | lens d's ground was rerun by the reviewer at 5f6b228 (archives, clean venvs, upgrade from PyPI 0.2.0, 3.10 to 3.14t), all green; the summaries of lens a round 6 and of this review are recorded here and in the lens table at finalize | |
 
+Gates at e2dd653 on a fresh clone (Elena's PC, turn elena/4, CPython 3.14.2): `ruff format
+--check .`, `ruff check .`, `mypy --strict src`, `mypy --strict src tests scripts` and
+`pytest` (703 passed, 13 skipped, all opt-in) each exit 0. `python scripts/capture_oracles.py`
+with no arguments (multidict 7.1.0, Werkzeug 3.1.9, requests 2.34.2) gives the same seed and
+the same 900 runs as the committed fixture; only the capture date differs.
+
 ### Disputed findings
 
 None. Every finding of rounds 1 and 2 and of review round 1 was reproduced before it was fixed.
