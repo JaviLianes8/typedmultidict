@@ -38,7 +38,57 @@ MultiDict[list[int], int]()
 MultiDict[int, int]().update(x=1)
 md.extend([("a", "b")])
 ci.update(b=1)
+reveal_type(md["a"])
+reveal_type(md.get("a", 0))
+reveal_type(md.get("a", "x"))
+reveal_type(md.pop("a"))
+reveal_type(md.pop("a", None))
+reveal_type(md.setdefault("a", 1))
+reveal_type(md.getall("a", None))
+reveal_type(md.popone("a"))
+reveal_type(md.popall("a"))
+reveal_type(md.keys())
+reveal_type(md.items())
+reveal_type(md.values())
+reveal_type(md.allitems())
+reveal_type(md.allvalues())
+reveal_type(next(iter(md)))
+reveal_type(md.popitem())
+reveal_type(ci.get("a", b""))
+reveal_type(ci.setdefault("a", b""))
+reveal_type(ci["a"])
+reveal_type(md.pop("a", 0))
+reveal_type(MultiDict(a=1))
+reveal_type(CIMultiDict([("a", b"")], b=b""))
+md.extend(c=3)
+md.merge([("a", 1)], d=4)
+MultiDict[int, int]().extend(x=1)
+bad: MultiDict[int, int] = MultiDict(x=1)
 """
+
+# Lines 27 onwards: what every other public method returns, with and without a default.
+MORE_REVEALED = {
+    27: "int",
+    28: "int",
+    29: "int | str",
+    30: "int",
+    31: "int | None",
+    32: "int",
+    33: "list[int] | None",
+    34: "int",
+    35: "list[int]",
+    36: "typing.KeysView[str]",
+    37: "typing.ItemsView[str, int]",
+    38: "typing.ValuesView[int]",
+    39: "typedmultidict._views.AllItemsView[str, int]",
+    40: "typedmultidict._views.AllValuesView[int]",
+    41: "str",
+    42: "tuple[str, int]",
+    43: "bytes",
+    44: "bytes",
+    45: "bytes",
+    46: "int",
+}
 
 
 @pytest.fixture(scope="module")
@@ -48,10 +98,12 @@ def mypy_output(tmp_path_factory: pytest.TempPathFactory) -> str:
     target.write_text(SNIPPET, encoding="utf-8")
     config = folder / "mypy.ini"
     config.write_text(f"[mypy]\nmypy_path = {SRC.as_posix()}\n", encoding="utf-8")
-    cache = str(folder / "cache")
-    out, err, _ = api.run(
-        ["--strict", "--config-file", str(config), "--cache-dir", cache, str(target)]
-    )
+    # A cold Windows venv once raised FileNotFoundError from the cache: the folder exists
+    # before mypy starts, and no earlier cache is read.
+    cache = folder / "cache"
+    cache.mkdir()
+    args = ["--strict", "--no-incremental", "--config-file", str(config), "--cache-dir"]
+    out, err, _ = api.run([*args, str(cache), str(target)])
     return str(out) + str(err)
 
 
@@ -94,9 +146,21 @@ def test_unhashable_key_types_are_rejected_by_the_bound(mypy_output: str) -> Non
     assert re.search(r"snippet\.py:23: error: .*\[type-var\]", mypy_output), mypy_output
 
 
+def test_every_other_public_method_carries_its_types(mypy_output: str) -> None:
+    for line, expected in MORE_REVEALED.items():
+        assert _revealed(mypy_output, line) == expected, line
+
+
+def test_keyword_pairs_build_and_extend_string_keyed_multi_dicts(mypy_output: str) -> None:
+    assert _revealed(mypy_output, 47) == "typedmultidict._multidict.MultiDict[str, int]"
+    assert _revealed(mypy_output, 48) == "typedmultidict._cimultidict.CIMultiDict[bytes]"
+    for line in (51, 52):
+        assert re.search(rf"snippet\.py:{line}: error", mypy_output), (line, mypy_output)
+
+
 def test_no_other_line_has_an_error(mypy_output: str) -> None:
     lines = {int(n) for n in re.findall(r"snippet\.py:(\d+): error", mypy_output)}
-    assert lines == set(range(20, 27))
+    assert lines == set(range(20, 27)) | {51, 52}
 
 
 def _revealed(output: str, line: int) -> str:

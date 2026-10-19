@@ -11,3 +11,5 @@ dist/
 .coverage
 htmlcov/
 .hypothesis/
+tests/sources/*
+!tests/sources/MANIFEST.json

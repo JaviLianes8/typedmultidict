@@ -1,0 +1,51 @@
+{
+  "collections-abc.html": {
+    "fetched": "2026-10-17",
+    "licence": "PSF documentation licence",
+    "sha256": "a393084cb12b707dc7f43ba60ec8947e7a8359ce7c8adec306375c1bb898b4d0",
+    "size": 99193,
+    "url": "https://docs.python.org/3.14/library/collections.abc.html"
+  },
+  "email-compat32-message.html": {
+    "fetched": "2026-10-17",
+    "licence": "PSF documentation licence",
+    "sha256": "cfc6e934d484e858ffe521ed74d972ad5f19bf91ca1fa6d303f46b4991c1aa9e",
+    "size": 103651,
+    "url": "https://docs.python.org/3.14/library/email.compat32-message.html"
+  },
+  "multidict.html": {
+    "fetched": "2026-10-17",
+    "licence": "Apache-2.0 (aio-libs/multidict)",
+    "sha256": "a12898ef4d34d037f1ca8ab5dbe6b52c334f81b79098e6d995586074ef3be841",
+    "size": 85026,
+    "url": "https://multidict.aio-libs.org/en/stable/multidict/"
+  },
+  "requests-structures.py.txt": {
+    "fetched": "2026-10-17",
+    "licence": "Apache-2.0 (psf/requests)",
+    "sha256": "ba9460c39078f25e6f1d2a24ac941ac6f8d2ee97197fa8c8d0c262d8a1e67a02",
+    "size": 4134,
+    "url": "https://raw.githubusercontent.com/psf/requests/v2.34.2/src/requests/structures.py"
+  },
+  "rfc9110.txt": {
+    "fetched": "2026-10-17",
+    "licence": "IETF Trust, BCP 78 (Revised BSD for code components)",
+    "sha256": "21c1cdce6ab0e5509b04d84a28000836c7a087cf786efe6f04877ebfff47232a",
+    "size": 502941,
+    "url": "https://www.rfc-editor.org/rfc/rfc9110.txt"
+  },
+  "werkzeug-datastructures.html": {
+    "fetched": "2026-10-17",
+    "licence": "BSD-3-Clause (pallets/werkzeug)",
+    "sha256": "f1823e00779370c24c4aeecbf7600142715e439ae59c685882e075494f6ba2fc",
+    "size": 337353,
+    "url": "https://werkzeug.palletsprojects.com/en/stable/datastructures/"
+  },
+  "wsgiref.html": {
+    "fetched": "2026-10-17",
+    "licence": "PSF documentation licence",
+    "sha256": "692983117908390e0cef77a7a71780fec7fe9d51613e3d81f28889007036bf16",
+    "size": 125636,
+    "url": "https://docs.python.org/3.14/library/wsgiref.html"
+  }
+}

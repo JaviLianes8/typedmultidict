@@ -6,6 +6,67 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-19
+
+The public API is now stable: `MultiDict`, `CIMultiDict`, `AllItemsView` and
+`AllValuesView`, every method name, signature and default, the error types and the
+behaviour described in the README and the guide. Later 1.x releases only add.
+
+### Added
+
+- `AllItemsView` and `AllValuesView` are exported, so the views returned by `allitems()`
+  and `allvalues()` can be named in annotations.
+- `getall(key, default)` returns `default` for an absent key, as in `multidict`;
+  `getall(key)` still returns an empty list.
+- Every public class and method carries a docstring with examples that the test suite
+  runs.
+
+### Changed (upgrading from 0.2.0)
+
+- The constructor, `extend` and `merge` take keyword pairs for string keys, as `update`
+  already did and as in `dict()` and `multidict`: `MultiDict([("a", 1)], b=2)`,
+  `md.extend(c=3)`. Any string can be a keyword key, `self` included. Their source
+  argument is positional only and optional, so `extend()` and `merge()` with no argument
+  do nothing. `MultiDict(initial=x)` now stores one pair named `"initial"`, as
+  `dict(initial=x)` does; pass the source positionally.
+- `pop` and `setdefault` refuse, with `RuntimeError` and no change, a write that a key's
+  `__eq__` or `__hash__` makes while they look the key up; before, that write went through.
+  The lookup is `self[key]`, so a subclass `__getitem__` that writes to the multi-dict
+  (to fill in a missing key, say) makes `pop` and `setdefault` raise `RuntimeError` too;
+  `md[key]` alone still runs it.
+- `CIMultiDict` checks the real type of a key, so an object that only claims to be a
+  `str` (a `Mock(spec=str)`, a proxy) is absent on lookup and refused with the documented
+  `TypeError` on write, instead of failing inside `str.lower`.
+- `keys()`, `items()` and `values()` views pickle as a call of that method on the
+  multi-dict (`operator.methodcaller`), so a pickle never names a private module.
+  Pickles of these views written by 0.2.0 still load.
+- Removing pairs no longer scans the whole multi-dict: `del md[key]`, `pop`, `popone`,
+  `popall`, assignment and `update` cost time in proportion to the pairs they remove.
+  Deleting every key one by one is linear overall instead of quadratic.
+- Bulk input reads at most three items of each element, so an endless or huge element
+  fails at once with `ValueError` instead of hanging. The message gives the exact length
+  of a tuple or list and says "3 or more" for other iterables.
+- A source with an `items()` method is read through `items()`, as the `multidict` C
+  extension reads it, so building from an `http.client.HTTPMessage`, an
+  `email.message.Message`, a `wsgiref.headers.Headers` or another library's multi-dict
+  keeps every field. 0.2.0 read such objects through `keys()` and `[]`, which repeated
+  the first value of a repeated name. An object with only `keys()` and `[]` is still read
+  like `dict.update` reads it.
+- Error messages show at most 40 characters of a type name, and never the offending value.
+- The version has a single source (`typedmultidict.__version__`).
+- A key whose `__eq__` or `__hash__` writes to the same multi-dict in the middle of a write
+  now gets `RuntimeError` and the multi-dict is left unchanged; before, the internal index
+  could silently go out of step.
+- `keys()`, `items()` and `values()` iterators raise `RuntimeError` for a change made
+  between `iter()` and the first item, as `iter(md)` and `dict` views do.
+- `repr` of a view held inside its own multi-dict prints `...` instead of recursing.
+- Every view pickles at every protocol (`allitems()` and `allvalues()` failed at protocols
+  0 and 1, and on Python 3.10 `keys()`, `items()` and `values()` came back broken).
+- `get`, `pop`, `setdefault`, `keys`, `items`, `values` and `clear` are now written out on
+  the class with their own docstrings. They behave as the `collections.abc` mixins did,
+  and `get`, `pop` and `setdefault` still go through `__getitem__`, `__setitem__` and
+  `__delitem__`, so a subclass that overrides those hooks sees the same calls as before.
+
 ## [0.2.0] - 2026-10-13
 
 ### Added
@@ -20,7 +81,7 @@ All notable changes to this project are documented here. The format follows
 - Lookups, `in`, `len()` and adding no longer scan every pair: an index keeps them
   constant time whatever the size.
 - `update` replaces the values of each incoming key in place instead of keeping only the
-  first value of a multi-dict source, and `popitem` removes only the last pair added.
+  first value of a multi-dict source, and `popitem` removes only the last pair.
 - `popall(key, default)` accepts a default of any type.
 - Bulk input is checked in full before anything changes: `md.extend(md)` no longer hangs,
   and a malformed element raises `TypeError` or `ValueError` with its position.

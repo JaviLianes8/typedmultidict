@@ -4,16 +4,26 @@ build-backend = "hatchling.build"
 
 [project]
 name = "typedmultidict"
-version = "0.2.0"
+dynamic = ["version"]
 description = "Pure-Python typed ordered multi-value dictionary with a case-insensitive variant"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Javier Lianes", email = "javier@lianes8studio.com" }]
-keywords = ["multidict", "multi-value", "dictionary", "mapping", "headers", "typed"]
+keywords = [
+    "multidict",
+    "multi-value",
+    "dictionary",
+    "mapping",
+    "headers",
+    "http",
+    "case-insensitive",
+    "query-string",
+    "typed",
+]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
@@ -23,6 +33,8 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Software Development :: Libraries",
     "Typing :: Typed",
 ]
 dependencies = []
@@ -32,24 +44,40 @@ dev = [
     "ruff",
     "mypy",
     "pytest",
+    "pytest-timeout",
     "hypothesis",
     "build",
     "twine",
     # Test-only reference implementations; the library never imports them.
     "multidict",
     "werkzeug",
+    "requests",
 ]
 
 [project.urls]
 Homepage = "https://lianes8studio.com"
-Repository = "https://github.com/JaviLianes8/typedmultidict"
+Source = "https://github.com/JaviLianes8/typedmultidict"
 Issues = "https://github.com/JaviLianes8/typedmultidict/issues"
 Changelog = "https://github.com/JaviLianes8/typedmultidict/blob/main/CHANGELOG.md"
 LinkedIn = "https://www.linkedin.com/in/jlianes/"
 Funding = "https://buymeacoffee.com/jlianesglrs"
 
+[tool.hatch.version]
+path = "src/typedmultidict/__init__.py"
+
 [tool.hatch.build.targets.sdist]
-exclude = [".github", "IMPROVEMENTS-round*.md"]
+only-include = [
+    "src",
+    "tests",
+    "scripts",
+    "README.md",
+    "GUIDE.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "pyproject.toml",
+    "requirements-dev.txt",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/typedmultidict"]
@@ -69,3 +97,5 @@ strict = true
 testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = "-q"
+# A hang fails its test instead of stalling the run.
+timeout = 300

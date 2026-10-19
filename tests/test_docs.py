@@ -1,4 +1,4 @@
-"""The README examples run and print what their comments say; versions and docs agree."""
+"""README and guide examples run and print what their comments say; versions and docs agree."""
 
 from __future__ import annotations
 
@@ -12,10 +12,11 @@ from typedmultidict import MultiDict
 
 ROOT = Path(__file__).resolve().parents[1]
 README = (ROOT / "README.md").read_text(encoding="utf-8")
+GUIDE = (ROOT / "GUIDE.md").read_text(encoding="utf-8")
 
 
-def _python_blocks() -> list[str]:
-    return re.findall(r"```python\n(.*?)```", README, flags=re.DOTALL)
+def _python_blocks(text: str = README) -> list[str]:
+    return re.findall(r"```python\n(.*?)```", text, flags=re.DOTALL)
 
 
 def _expected_prints(block: str) -> list[str]:
@@ -38,6 +39,24 @@ def test_every_readme_example_runs_and_prints_its_comment() -> None:
     assert checked >= 25
 
 
+def test_every_guide_example_runs_and_prints_its_comment() -> None:
+    blocks = _python_blocks(GUIDE)
+    assert len(blocks) >= 2
+    for block in blocks:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            exec(compile(block, "GUIDE.md", "exec"), {"__name__": "guide"})
+        assert out.getvalue().splitlines() == _expected_prints(block)
+
+
+def test_readme_links_are_absolute_and_reach_the_guide_and_changelog() -> None:
+    # A link target has no spaces or "=" (that would be a call such as MultiDict[K, V](...)).
+    links = re.findall(r"\]\(([^)=\s]+)\)", README)
+    assert links and all(link.startswith("https://") for link in links), links
+    assert any(link.endswith("/GUIDE.md") for link in links)
+    assert any(link.endswith("/CHANGELOG.md") for link in links)
+
+
 def test_the_api_table_lists_every_public_name_and_method() -> None:
     table = README.split("## API", 1)[1].split("\n## ", 1)[0]
     for name in typedmultidict.__all__:
@@ -47,17 +66,18 @@ def test_the_api_table_lists_every_public_name_and_method() -> None:
         assert re.search(rf"`(md\.)?{method}\b", table), method
 
 
-def test_version_matches_pyproject_and_changelog() -> None:
+def test_version_has_one_source_and_a_changelog_entry() -> None:
     text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    match = re.search(r'^version = "([^"]+)"$', text, flags=re.MULTILINE)
-    assert match is not None
-    assert match.group(1) == typedmultidict.__version__
+    assert 'dynamic = ["version"]' in text
+    assert 'path = "src/typedmultidict/__init__.py"' in text
+    assert re.search(r"^version\s*=", text, flags=re.MULTILINE) is None
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     assert f"## [{typedmultidict.__version__}]" in changelog
 
 
 def test_no_em_dash_in_shipped_text() -> None:
-    paths = [ROOT / "README.md", ROOT / "CHANGELOG.md", *ROOT.joinpath("src").rglob("*.py")]
+    paths = [ROOT / "README.md", ROOT / "CHANGELOG.md", ROOT / "GUIDE.md"]
+    paths += [*ROOT.joinpath("src").rglob("*.py"), *ROOT.joinpath("tests").rglob("*.py")]
     for path in paths:
         assert chr(0x2014) not in path.read_text(encoding="utf-8"), path
 
