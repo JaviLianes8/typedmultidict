@@ -11,8 +11,8 @@ Progress:
 - [x] Packaging, e2e and upgrade from PyPI 0.2.0 (items 8, 13, 14)
 - [x] Every interpreter on this PC (item 10)
 - [x] Bulk input read through `items()`, author mutation round 3 (items 1, 7, 18)
-- [ ] Five QA lenses report PASS (item 19)
-- [ ] Independent reviewer (item 16)
+- [x] Five QA lenses report PASS (item 19): last rounds at 5f6b228 and 825b992
+- [x] Independent reviewer (item 16): round 3 PASS at 3931de7
 - [x] Gates (item 15): at 926996d on a fresh clone (laptop, CPython 3.14), `ruff format --check .`,
   `ruff check .`, `mypy --strict src` (and `src tests scripts`) and `pytest` each exit 0
 - [ ] PR open and trace guard CLEAN (item 17); merge and publish left to the maintainer
@@ -247,6 +247,10 @@ and sweep at most 40 new mutations on the code changed since.
 | b | 5 | 975b020 | FAIL | N1 the same `self` keyword pair (multidict's C extension accepts it); N2 the 3.14 exception named only `email.message`, while `http.client.HTTPMessage` refuses non-ASCII names there too. Fixed in 3314dad |
 | c | 7 | 975b020 | FAIL | N1 the same `self` keyword pair (3.10.19, 3.13.2, 3.14.2t); N2 a subclass `__getitem__` that writes now makes `pop` and `setdefault` raise `RuntimeError`, undocumented. Documented and pinned in 3314dad |
 | e | 3 | 975b020 | FAIL | M59 confirmed killed; F2-N38 (keyword pairs equal to a positional pair dropped) and F3-N19 (`isinstance` back in `type_name`) survived 697 tests. Contracts added in 3314dad |
+| a | 6 | 5f6b228 | PASS | B1 fixed on 3.10.19, 3.12.12, 3.13.2 and 3.14.2 (a keyword pair named `self` is stored by the constructor, `extend`, `merge` and `update` of both classes); the new contract fails on the 975b020 source and passes here |
+| b | 6 | 5f6b228 | PASS | N1 and N2 fixed; a 34-probe sweep run live against multidict 7.1.0 (C and pure), `email.message` and `http.client` on 3.10.19, 3.12.12, 3.13.2, 3.14.2 and 3.14.2t found nothing |
+| c | 8 | 5f6b228 | PASS | 38 probes on 3.10.19, 3.13.2 and 3.14.2t, each as expected (hostile keys, writing subclass hooks, spoofed key types, secret values never echoed); keyword and lookup paths scale linearly up to 200 000 keys |
+| e | 4 | 5f6b228 | PASS | M59, N19 and N38 killed; own sweep of 40 new mutations on the code changed since 220c40a plus M59: 41 run, 41 killed |
 
 ### QA round 1 at 220c40a: what changed (11cb80a)
 
@@ -320,6 +324,25 @@ the diff from 5f6b228 touches no code, tests or packaging.
 | R2 summary | this section records the review, whose own report could not be written | |
 | R2 OBS flaky typing | the first `pytest` in a brand-new venv once raised `FileNotFoundError` at setup of the module-scoped mypy fixture in `tests/test_typing.py`, not reproduced in later runs. The fixture now creates its cache folder before mypy starts and runs with `--no-incremental`, so no earlier cache is read. Test harness only, no library change | `tests/test_typing.py` (10 passed on three fresh basetemps) |
 
+### Independent review round 3 at 3931de7: what changed
+
+The same reviewer re-ran everything on a fresh clone (Elena's PC, turn elena/4, CPython
+3.14.2): `ruff format --check .` (61 files), `ruff check .`, `mypy --strict src` (11 files),
+`mypy --strict src tests scripts` (55 files), `pytest` (703 passed, 13 skipped, on two full
+runs with fresh basetemps), `python -m build` and `twine check --strict` on both archives
+(wheel: the 11 package modules, `py.typed`, LICENSE and metadata; sdist: 69 entries). The
+wheel, installed in a throwaway venv and imported in isolated mode from outside the tree,
+reports 1.0.0 from site-packages. `tests/test_typing.py` alone passed 10 of 10 on three
+fresh basetemps. CHANGELOG has `## [1.0.0] - 2026-10-19`; classifiers are
+`5 - Production/Stable` and 3.10 to 3.14, with no runtime dependencies; every `.py` file is
+at most 200 lines. Verdict PASS: items 1 to 16, 18 and 19 PASS, item 17 pending the merge.
+The diff from fcf1e09 touches only this report and `tests/test_typing.py`; nothing in `src`
+or `pyproject.toml` changed since 5f6b228, so items 1 to 10 and 18 carry over.
+
+| Finding | Change | Proof |
+| --- | --- | --- |
+| R3 summary | this section records the review, whose own report could not be written; the last round of each lens is in the lens table and items 16 and 19 are checked in the progress list | this report |
+
 ### Disputed findings
 
-None. Every finding of rounds 1 and 2 and of review rounds 1 and 2 was reproduced or recorded before it was fixed.
+None. Every finding of rounds 1 and 2 and of review rounds 1 to 3 was reproduced or recorded before it was fixed.
