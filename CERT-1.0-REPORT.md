@@ -300,6 +300,26 @@ Gates at e2dd653 on a fresh clone (Elena's PC, turn elena/4, CPython 3.14.2): `r
 with no arguments (multidict 7.1.0, Werkzeug 3.1.9, requests 2.34.2) gives the same seed and
 the same 900 runs as the committed fixture; only the capture date differs.
 
+### Independent review round 2 at fcf1e09: what changed
+
+The same reviewer re-ran the gates on a fresh clone (laptop, CPython 3.14.6): `ruff format
+--check .`, `ruff check .`, `mypy --strict src` (11 files), `mypy --strict src tests scripts`
+(55 files), `pytest` (703 passed, 13 skipped, green on both full runs), `python -m build` and
+`twine check --strict` on both archives (wheel: package modules, `py.typed`, LICENSE and
+metadata only; sdist: 69 entries). Verdict PASS: items 1 to 16, 18 and 19 PASS, item 17
+pending the merge. Item 11 is fixed (the README names only the references the GUIDE checks
+live, `orderedmultidict` stays only as the verified fact that it depends on `six`), so item
+16 passes. OBS a and b are fixed: the requests version reads v2.34.2, and
+`capture_oracles.py` with no arguments gives the committed fixture's runs and seed on
+CPython 3.14.6 (multidict 7.1.0, Werkzeug 3.1.9, requests 2.34.2); only the capture date and
+the Python version differ. Items 1 to 10, 12 to 14 and 18 carry over from round 1, since
+the diff from 5f6b228 touches no code, tests or packaging.
+
+| Finding | Change | Proof |
+| --- | --- | --- |
+| R2 summary | this section records the review, whose own report could not be written | |
+| R2 OBS flaky typing | the first `pytest` in a brand-new venv once raised `FileNotFoundError` at setup of the module-scoped mypy fixture in `tests/test_typing.py`, not reproduced in later runs. The fixture now creates its cache folder before mypy starts and runs with `--no-incremental`, so no earlier cache is read. Test harness only, no library change | `tests/test_typing.py` (10 passed on three fresh basetemps) |
+
 ### Disputed findings
 
-None. Every finding of rounds 1 and 2 and of review round 1 was reproduced before it was fixed.
+None. Every finding of rounds 1 and 2 and of review rounds 1 and 2 was reproduced or recorded before it was fixed.

@@ -98,10 +98,12 @@ def mypy_output(tmp_path_factory: pytest.TempPathFactory) -> str:
     target.write_text(SNIPPET, encoding="utf-8")
     config = folder / "mypy.ini"
     config.write_text(f"[mypy]\nmypy_path = {SRC.as_posix()}\n", encoding="utf-8")
-    cache = str(folder / "cache")
-    out, err, _ = api.run(
-        ["--strict", "--config-file", str(config), "--cache-dir", cache, str(target)]
-    )
+    # A cold Windows venv once raised FileNotFoundError from the cache: the folder exists
+    # before mypy starts, and no earlier cache is read.
+    cache = folder / "cache"
+    cache.mkdir()
+    args = ["--strict", "--no-incremental", "--config-file", str(config), "--cache-dir"]
+    out, err, _ = api.run([*args, str(cache), str(target)])
     return str(out) + str(err)
 
 
