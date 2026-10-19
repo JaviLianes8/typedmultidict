@@ -249,7 +249,7 @@ and sweep at most 40 new mutations on the code changed since.
 | e | 3 | 975b020 | FAIL | M59 confirmed killed; F2-N38 (keyword pairs equal to a positional pair dropped) and F3-N19 (`isinstance` back in `type_name`) survived 697 tests. Contracts added in 3314dad |
 | a | 6 | 5f6b228 | PASS | B1 fixed on 3.10.19, 3.12.12, 3.13.2 and 3.14.2 (a keyword pair named `self` is stored by the constructor, `extend`, `merge` and `update` of both classes); the new contract fails on the 975b020 source and passes here |
 | b | 6 | 5f6b228 | PASS | N1 and N2 fixed; a 34-probe sweep run live against multidict 7.1.0 (C and pure), `email.message` and `http.client` on 3.10.19, 3.12.12, 3.13.2, 3.14.2 and 3.14.2t found nothing |
-| c | 8 | 5f6b228 | PASS | 38 probes on 3.10.19, 3.13.2 and 3.14.2t, each as expected (hostile keys, writing subclass hooks, spoofed key types, secret values never echoed); keyword and lookup paths scale linearly up to 200 000 keys |
+| c | 8 | 5f6b228 | PASS | F1 (fixed by the docs: an unlocked multi-dict still corrupts under concurrent writes, as README and GUIDE now say), F2 and F3 confirmed fixed on 3.10.19, 3.13.2 and 3.14.2t; 40 probes, each as expected (keyword pairs including `self`, atomicity with secret values never echoed, the guarded lookup of `pop` and `setdefault` released after an error, real-type `str` checks, hostile `allitems()` membership, view pickles at every protocol); keyword and lookup paths scale linearly up to 800 000 keys. Two cases recorded, not defects: a tuple subclass with a lying `__len__` makes `in allitems()` raise `ValueError`, and a `super()` view of a subclass whose `keys()` returns a list unpickles as that list |
 | e | 4 | 5f6b228 | PASS | M59, N19 and N38 killed; own sweep of 40 new mutations on the code changed since 220c40a plus M59: 41 run, 41 killed |
 
 ### QA round 1 at 220c40a: what changed (11cb80a)
@@ -347,6 +347,17 @@ Recorded in 1a5730d. Gates at 1a5730d on a fresh clone (Elena's PC, turn elena/4
 3.14): `ruff format --check .`, `ruff check .`, `mypy --strict src`, `mypy --strict src tests
 scripts` and `pytest` (703 passed, 13 skipped, all opt-in) each exit 0.
 
+### QA round 3 at 5f6b228: what changed
+
+Lens c re-checked its round 2 findings and swept the changed code; verdict PASS.
+
+| Finding | Change | Proof |
+| --- | --- | --- |
+| c F1, F2, F3 | none needed: confirmed fixed (F1 by the README and GUIDE thread-safety paragraphs) | `tests/test_contracts_threads.py`, `tests/test_hostile.py`, `tests/test_hostile_more.py`, `tests/test_contracts_spoofed.py` |
+| c sweep | none needed: 40 probes, no defect; the two recorded cases need a type that breaks the tuple protocol or a `keys()` that returns a list, and come out as Python's own behaviour | lens table, c round 8 |
+
+No change to `src`, tests or packaging; this report only.
+
 ### Disputed findings
 
-None. Every finding of rounds 1 and 2 and of review rounds 1 to 3 was reproduced or recorded before it was fixed.
+None. Every finding of rounds 1 to 3 and of review rounds 1 to 3 was reproduced or recorded before it was fixed.
